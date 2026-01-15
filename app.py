@@ -438,10 +438,27 @@ def render_subject_html(subjects, link_map):
     html_parts = []
     html_parts.append("""
     <style>
-    .sub-alloc-wrapper { font-family: 'Poppins', sans-serif; margin-top: 10px; border-radius: 12px; overflow: hidden; border: none; box-shadow: 0 4px 20px rgba(0,0,0,0.05); background: white; }
-    table.sub-alloc-table { width: 100%; border-collapse: collapse; background: white; }
-    .sub-alloc-table thead th { background: linear-gradient(90deg, #a18cd1 0%, #fbc2eb 100%); color: white; padding: 18px; font-size: 17px; font-weight: 700; text-align: left; }
-    .sub-alloc-table tbody td { padding: 16px; font-size: 16px; color: #2c3e50; border-bottom: 1px solid #f0f0f0; background: #ffffff; vertical-align: middle; transition: all 0.2s; }
+    /* CHANGED: overflow: hidden -> overflow-x: auto for mobile scrolling */
+    .sub-alloc-wrapper { 
+        font-family: 'Poppins', sans-serif; 
+        margin-top: 10px; 
+        border-radius: 12px; 
+        overflow-x: auto;  /* ALLOWS SCROLLING */
+        border: none; 
+        box-shadow: 0 4px 20px rgba(0,0,0,0.05); 
+        background: white; 
+    }
+    
+    /* ADDED: min-width ensures the table doesn't get squashed */
+    table.sub-alloc-table { 
+        width: 100%; 
+        min-width: 600px; /* Forces scroll on small screens */
+        border-collapse: collapse; 
+        background: white; 
+    }
+    
+    .sub-alloc-table thead th { background: linear-gradient(90deg, #a18cd1 0%, #fbc2eb 100%); color: white; padding: 18px; font-size: 17px; font-weight: 700; text-align: left; white-space: nowrap; }
+    .sub-alloc-table tbody td { padding: 16px; font-size: 16px; color: #2c3e50; border-bottom: 1px solid #f0f0f0; background: #ffffff; vertical-align: middle; transition: all 0.2s; white-space: nowrap; }
     
     .sub-alloc-table tbody tr:hover td { background-color: #f8f9fa; transform: scale(1.005); color: #6a11cb; cursor: default; }
 
@@ -680,3 +697,4 @@ st.markdown("""
     Student Portal © 2026 • Built by <span style="color:#6a11cb; font-weight:700">IRONDEM2921 [AIML]</span>
 </div>
 """, unsafe_allow_html=True)
+
