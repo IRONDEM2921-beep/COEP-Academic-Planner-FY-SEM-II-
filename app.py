@@ -255,6 +255,102 @@ def map_to_slot(time_str, slots):
     except: pass
     return None
 
+# ... (after map_to_slot function) ...
+
+def inject_notification_logic(daily_schedule):
+    """
+    Injects JS to handle client-side notifications using the HTML5 Notification API.
+    Includes logic for 3D icons, formal text, and Mobile/Desktop compatibility.
+    """
+    # Convert Python schedule to JSON so JS can read it
+    schedule_json = json.dumps(daily_schedule)
+    
+    js_code = f"""
+    <script>
+    const schedule = {schedule_json};
+    
+    // --- ASSETS: STYLIZED 3D ICONS ---
+    // Light Mode: Stylized Stack of Books
+    const ICON_LIGHT_MODE = "https://cdn-icons-png.flaticon.com/512/3330/3330314.png"; 
+    // Dark Mode: Stylized Mortarboard (Graduation Cap)
+    const ICON_DARK_MODE  = "https://cdn-icons-png.flaticon.com/512/3330/3330317.png"; 
+
+    const NOTIFICATION_TITLE = "📅 Upcoming Class Alert";
+
+    function checkTime() {{
+        const now = new Date();
+        const currentHours = now.getHours();
+        const currentMinutes = now.getMinutes();
+
+        console.log("Checking schedule..." + currentHours + ":" + currentMinutes);
+
+        schedule.forEach(cls => {{
+            if (!cls.StartTime) return;
+            
+            // Parse Class Start Time (e.g. "14:30")
+            let [clsH, clsM] = cls.StartTime.split(":");
+            let classDate = new Date();
+            classDate.setHours(parseInt(clsH), parseInt(clsM), 0);
+            
+            // Calculate Difference in Minutes
+            let diffMs = classDate - now;
+            let diffMins = Math.floor(diffMs / 60000);
+
+            // TRIGGER: If class is exactly 30 minutes away
+            if (diffMins === 30) {{
+                sendSmartNotification(cls.Subject, cls.Venue, diffMins);
+            }}
+        }});
+    }}
+
+    function sendSmartNotification(subject, venue, mins) {{
+        if (!("Notification" in window)) return;
+
+        if (Notification.permission === "granted") {{
+            
+            // Detect Theme for Icon
+            let chosenIcon = ICON_LIGHT_MODE;
+            if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {{
+                chosenIcon = ICON_DARK_MODE;
+            }} else {{
+                chosenIcon = ICON_LIGHT_MODE;
+            }}
+
+            // --- FORMAL BODY TEXT ---
+            const formalBody = `⏳ Subject: ${{subject}}\\n📍 Venue: ${{venue}}\\n⏰ Starts in 30 minutes.`;
+
+            const notification = new Notification(NOTIFICATION_TITLE, {{
+                body: formalBody,
+                icon: chosenIcon, 
+                vibrate: [200, 100, 200], // Vibration for Mobile
+                requireInteraction: true 
+            }});
+            
+            notification.onclick = function() {{
+                window.focus();
+                this.close();
+            }};
+        }}
+    }}
+
+    // Check time every 60 seconds
+    setInterval(checkTime, 60000);
+    // Also check immediately on load to ensure timer is active
+    setTimeout(checkTime, 2000);
+    </script>
+    """
+    
+    # Inject the JS invisibly
+    st.components.v1.html(js_code, height=0, width=0)
+    
+    # Permission Button in Sidebar
+    st.sidebar.markdown("### 🔔 Notification Settings")
+    if st.sidebar.button("Enable Class Alerts", key="enable_notif_formal_btn"):
+        st.components.v1.html(
+            "<script>Notification.requestPermission().then(perm => { if(perm==='granted'){ alert('You are now subscribed to class alerts!'); } });</script>", 
+            height=0, width=0
+        )
+
 # --- GOOGLE SHEETS PERSISTENCE ---
 def get_google_sheet():
     # Load credentials from Streamlit Secrets
@@ -549,6 +645,13 @@ else:
             st.markdown("""<h3 style="font-size: 28px; font-weight: 700; margin: 20px 0; background: linear-gradient(to right, #6a11cb, #fbc2eb); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">🗓️ Weekly Schedule</h3>""", unsafe_allow_html=True)
             
             if table:
+                # Filter the master table to get only TODAY'S classes for the notification logic
+                today_name = datetime.now().strftime("%A")
+                todays_classes = [t for t in table if t['Day'] == today_name]
+            
+                # Inject the notification system
+                if todays_classes:
+                    inject_notification_logic(todays_classes)
                 st.markdown(render_grid(table), unsafe_allow_html=True)
             else:
                 st.warning("No schedule found.")
@@ -697,4 +800,5 @@ st.markdown("""
     Student Portal © 2026 • Built by <span style="color:#6a11cb; font-weight:700">IRONDEM2921 [AIML]</span>
 </div>
 """, unsafe_allow_html=True)
+
 
