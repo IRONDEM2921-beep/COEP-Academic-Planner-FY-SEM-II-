@@ -255,119 +255,90 @@ def map_to_slot(time_str, slots):
     except: pass
     return None
 
-# ... (after map_to_slot function) ...
+# --- GOOGLE SHEETS PERSISTENCE ---
 
-def inject_notification_logic(daily_schedule):
-    import json
+def generate_master_ics(weekly_schedule, semester_end_date):
+    """
+    Combines ALL classes into a single ICS file with weekly recurrence.
+    """
+    # Map Day Name to ICS format
+    day_map = {
+        "Monday": "MO", "Tuesday": "TU", "Wednesday": "WE",
+        "Thursday": "TH", "Friday": "FR", "Saturday": "SA", "Sunday": "SU"
+    }
     
-    # --- 1. INITIALIZE SESSION STATE ---
-    if 'alerts_enabled' not in st.session_state:
-        st.session_state.alerts_enabled = False
-
-    # --- 2. DEFINE THE JAVASCRIPT (Only injected if enabled) ---
-    if st.session_state.alerts_enabled:
-        schedule_json = json.dumps(daily_schedule)
-        
-        # We add a visual status indicator
-        st.sidebar.markdown("---")
-        status_container = st.sidebar.empty()
-        
-        js_code = f"""
-        <audio id="alert-sound" preload="auto">
-            <source src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" type="audio/mpeg">
-        </audio>
-
-        <script>
-        const schedule = {schedule_json};
-        const ICON = "https://cdn-icons-png.flaticon.com/512/3330/3330314.png";
-
-        function updateStatus(msg) {{
-            const el = window.parent.document.getElementById('js-status');
-            if (el) el.innerText = msg;
-        }}
-
-        function checkTime() {{
-            const now = new Date();
-            updateStatus("🟢 Active | Scanning: " + now.toLocaleTimeString());
-
-            schedule.forEach(cls => {{
-                if (!cls.StartTime) return;
-                
-                let [clsH, clsM] = cls.StartTime.split(":");
-                let classDate = new Date();
-                classDate.setHours(parseInt(clsH), parseInt(clsM), 0);
-                
-                let diffMs = classDate - now;
-                let diffMins = diffMs / 60000; 
-
-                // TRIGGER WINDOW: 1 min to 40 mins
-                if (diffMins > 0 && diffMins <= 40) {{
-                    let notifKey = `alert_v3_${{cls.Subject}}_${{cls.StartTime}}_${{now.toDateString()}}`;
-                    let alreadySent = sessionStorage.getItem(notifKey);
-
-                    if (!alreadySent) {{
-                        triggerAlert(cls.Subject, cls.Venue, Math.floor(diffMins));
-                        sessionStorage.setItem(notifKey, "true");
-                    }}
-                }}
-            }});
-        }}
-
-        function triggerAlert(subject, venue, mins) {{
-            // Play Sound
-            try {{
-                var audio = document.getElementById("alert-sound");
-                if(audio) audio.play();
-            }} catch(e) {{ console.log(e); }}
-
-            // Show Notification
-            if ("Notification" in window && Notification.permission === "granted") {{
-                const note = new Notification("📅 Class Alert: " + subject, {{
-                    body: `📍 ${{venue}}\\n⏰ Starts in ${{mins}} mins`,
-                    icon: ICON,
-                    requireInteraction: true,
-                    vibrate: [200, 100, 200]
-                }});
-                note.onclick = function() {{ window.focus(); this.close(); }};
-            }}
-        }}
-
-        // Run every 10 seconds
-        setInterval(checkTime, 10000);
-        setTimeout(checkTime, 1000);
-        </script>
-        """
-        # Inject the active script
-        st.components.v1.html(js_code, height=0, width=0)
+    # Header for the ICS file
+    ics_lines = [
+        "BEGIN:VCALENDAR",
+        "VERSION:2.0",
+        "PRODID:-//StudentPortal//MasterTimetable//EN",
+        "CALSCALE:GREGORIAN",
+        "METHOD:PUBLISH"
+    ]
     
-    # --- 3. SIDEBAR UI (TOGGLE BUTTONS) ---
-    st.sidebar.markdown("""
-        <h3 style='background: linear-gradient(45deg, #E0C3FC, #8EC5FC); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-size: 22px; font-weight: 700; margin-bottom: 10px;'>
-            🔔 Notification Settings
-        </h3>
-    """, unsafe_allow_html=True)
+    # We use today as the baseline to calculate the next occurrence of each class
+    today = date.today()
+    days_list = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 
-    if st.session_state.alerts_enabled:
-        # --- STATE: ENABLED (Show Disable Button) ---
-        st.sidebar.markdown('<div id="js-status" style="font-size:11px; color:#27ae60; margin-bottom:10px; font-weight:600;">System Active</div>', unsafe_allow_html=True)
-        
-        if st.sidebar.button("🔕 Disable Class Alerts", key="disable_notif_btn", type="secondary"):
-            st.session_state.alerts_enabled = False
-            st.rerun() # Rerun to remove the JS component
+    for cls in weekly_schedule:
+        try:
+            # 1. Calculate the next occurrence of this specific day
+            target_day_name = cls['Day'] 
+            if target_day_name not in days_list: continue
+
+            target_idx = days_list.index(target_day_name)
+            current_idx = today.weekday()
             
-    else:
-        # --- STATE: DISABLED (Show Enable Button) ---
-        st.sidebar.markdown('<div style="font-size:11px; color:grey; margin-bottom:10px;">Notifications are off</div>', unsafe_allow_html=True)
-        
-        if st.sidebar.button("🔔 Enable Class Alerts", key="enable_notif_btn", type="primary"):
-            st.session_state.alerts_enabled = True
+            # Calculate days ahead to find the first class date
+            if target_idx >= current_idx:
+                days_ahead = target_idx - current_idx
+            else:
+                days_ahead = 7 - (current_idx - target_idx)
+                
+            start_date = today + timedelta(days=days_ahead)
             
-            # Request Permissions IMMEDIATELY on click
-            st.components.v1.html(
-                "<script>Notification.requestPermission().then(perm => { if(perm!=='granted') alert('Please allow notifications in your browser settings.'); });</script>", 
-                height=0, width=0
-            )
-            st.rerun() # Rerun to inject the main JS
+            # 2. Parse Times
+            start_h, start_m = map(int, cls['StartTime'].split(':'))
+            dt_start = datetime.combine(start_date, datetime.min.time()).replace(hour=start_h, minute=start_m)
+            
+            # Use 'Duration' from your data, default to 1 hour if missing
+            dur = cls.get('Duration', 1)
+            dt_end = dt_start + timedelta(hours=dur)
+            
+            # 3. Format Strings for ICS
+            fmt = "%Y%m%dT%H%M%S"
+            dt_start_str = dt_start.strftime(fmt)
+            dt_end_str = dt_end.strftime(fmt)
+            
+            # Recur until Semester End
+            until_str = semester_end_date.strftime("%Y%m%dT235959")
+            rrule_day = day_map.get(target_day_name, "MO")
+            
+            # 4. Create Event Block
+            event_block = [
+                "BEGIN:VEVENT",
+                f"SUMMARY:{cls['Subject']} ({cls['Type']})",
+                f"DTSTART:{dt_start_str}",
+                f"DTEND:{dt_end_str}",
+                f"RRULE:FREQ=WEEKLY;BYDAY={rrule_day};UNTIL={until_str}",
+                f"LOCATION:{cls['Venue']}",
+                f"DESCRIPTION:Weekly {cls['Type']} session.",
+                "BEGIN:VALARM",
+                "TRIGGER:-PT15M",
+                "ACTION:DISPLAY",
+                "DESCRIPTION:Reminder",
+                "END:VALARM",
+                "END:VEVENT"
+            ]
+            ics_lines.extend(event_block)
+            
+        except Exception as e:
+            continue
+
+    ics_lines.append("END:VCALENDAR")
+    return "\n".join(ics_lines)
+
+
 def get_google_sheet():
     # Load credentials from Streamlit Secrets
     scope = ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive']
@@ -661,13 +632,32 @@ else:
             st.markdown("""<h3 style="font-size: 28px; font-weight: 700; margin: 20px 0; background: linear-gradient(to right, #6a11cb, #fbc2eb); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">🗓️ Weekly Schedule</h3>""", unsafe_allow_html=True)
             
             if table:
-                # Filter the master table to get only TODAY'S classes for the notification logic
-                today_name = datetime.now().strftime("%A")
-                todays_classes = [t for t in table if t['Day'] == today_name]
+                
+
+                # --- NEW: MASTER SYNC BUTTON ---
+                st.sidebar.markdown("---")
+                st.sidebar.markdown("""
+                    <h3 style='background: linear-gradient(45deg, #a18cd1, #fbc2eb); 
+                    -webkit-background-clip: text; -webkit-text-fill-color: transparent; 
+                    font-weight: 700; margin-bottom: 5px;'>
+                        📲 Calendar Sync
+                    </h3>
+                    <p style='font-size: 11px; color: gray; margin-bottom: 10px;'>
+                    One click to add your entire semester schedule to your phone.
+                    </p>
+                """, unsafe_allow_html=True)
             
-                # Inject the notification system
-                if todays_classes:
-                    inject_notification_logic(todays_classes)
+                # Generate the Master File using the helper function
+                master_ics_data = generate_master_ics(table, SEMESTER_END)
+            
+                # The Download Button
+                st.sidebar.download_button(
+                    label="📥 Sync Full Semester",
+                    data=master_ics_data,
+                    file_name=f"My_Semester_Timetable_{mis}.ics",
+                    mime="text/calendar",
+                    help="This downloads a calendar file. Open it to add ALL classes to your phone instantly."
+                )
                 st.markdown(render_grid(table), unsafe_allow_html=True)
             else:
                 st.warning("No schedule found.")
@@ -816,8 +806,3 @@ st.markdown("""
     Student Portal © 2026 • Built by <span style="color:#6a11cb; font-weight:700">IRONDEM2921 [AIML]</span>
 </div>
 """, unsafe_allow_html=True)
-
-
-
-
-
