@@ -258,111 +258,116 @@ def map_to_slot(time_str, slots):
 # ... (after map_to_slot function) ...
 
 def inject_notification_logic(daily_schedule):
-    """
-    Injects JS to handle client-side notifications using the HTML5 Notification API.
-    Includes logic for 3D icons, formal text, and Mobile/Desktop compatibility.
-    """
-    # Convert Python schedule to JSON so JS can read it
-    schedule_json = json.dumps(daily_schedule)
+    import json
     
-    js_code = f"""
-    <script>
-    const schedule = {schedule_json};
-    
-    // --- ASSETS: STYLIZED 3D ICONS ---
-    // Light Mode: Stylized Stack of Books
-    const ICON_LIGHT_MODE = "https://cdn-icons-png.flaticon.com/512/3330/3330314.png"; 
-    // Dark Mode: Stylized Mortarboard (Graduation Cap)
-    const ICON_DARK_MODE  = "https://cdn-icons-png.flaticon.com/512/3330/3330317.png"; 
+    # --- 1. INITIALIZE SESSION STATE ---
+    if 'alerts_enabled' not in st.session_state:
+        st.session_state.alerts_enabled = False
 
-    const NOTIFICATION_TITLE = "📅 Upcoming Class Alert";
+    # --- 2. DEFINE THE JAVASCRIPT (Only injected if enabled) ---
+    if st.session_state.alerts_enabled:
+        schedule_json = json.dumps(daily_schedule)
+        
+        # We add a visual status indicator
+        st.sidebar.markdown("---")
+        status_container = st.sidebar.empty()
+        
+        js_code = f"""
+        <audio id="alert-sound" preload="auto">
+            <source src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" type="audio/mpeg">
+        </audio>
 
-    function checkTime() {{
-        const now = new Date();
-        const currentHours = now.getHours();
-        const currentMinutes = now.getMinutes();
+        <script>
+        const schedule = {schedule_json};
+        const ICON = "https://cdn-icons-png.flaticon.com/512/3330/3330314.png";
 
-        console.log("Checking schedule..." + currentHours + ":" + currentMinutes);
-
-        schedule.forEach(cls => {{
-            if (!cls.StartTime) return;
-            
-            // Parse Class Start Time (e.g. "14:30")
-            let [clsH, clsM] = cls.StartTime.split(":");
-            let classDate = new Date();
-            classDate.setHours(parseInt(clsH), parseInt(clsM), 0);
-            
-            // Calculate Difference in Minutes
-            let diffMs = classDate - now;
-            let diffMins = Math.floor(diffMs / 60000);
-
-            // TRIGGER: If class is exactly 30 minutes away
-            if (diffMins === 30) {{
-                sendSmartNotification(cls.Subject, cls.Venue, diffMins);
-            }}
-        }});
-    }}
-
-    function sendSmartNotification(subject, venue, mins) {{
-        if (!("Notification" in window)) return;
-
-        if (Notification.permission === "granted") {{
-            
-            // Detect Theme for Icon
-            let chosenIcon = ICON_LIGHT_MODE;
-            if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {{
-                chosenIcon = ICON_DARK_MODE;
-            }} else {{
-                chosenIcon = ICON_LIGHT_MODE;
-            }}
-
-            // --- FORMAL BODY TEXT ---
-            const formalBody = `⏳ Subject: ${{subject}}\\n📍 Venue: ${{venue}}\\n⏰ Starts in 30 minutes.`;
-
-            const notification = new Notification(NOTIFICATION_TITLE, {{
-                body: formalBody,
-                icon: chosenIcon, 
-                vibrate: [200, 100, 200], // Vibration for Mobile
-                requireInteraction: true 
-            }});
-            
-            notification.onclick = function() {{
-                window.focus();
-                this.close();
-            }};
+        function updateStatus(msg) {{
+            const el = window.parent.document.getElementById('js-status');
+            if (el) el.innerText = msg;
         }}
-    }}
 
-    // Check time every 60 seconds
-    setInterval(checkTime, 60000);
-    // Also check immediately on load to ensure timer is active
-    setTimeout(checkTime, 2000);
-    </script>
-    """
+        function checkTime() {{
+            const now = new Date();
+            updateStatus("🟢 Active | Scanning: " + now.toLocaleTimeString());
+
+            schedule.forEach(cls => {{
+                if (!cls.StartTime) return;
+                
+                let [clsH, clsM] = cls.StartTime.split(":");
+                let classDate = new Date();
+                classDate.setHours(parseInt(clsH), parseInt(clsM), 0);
+                
+                let diffMs = classDate - now;
+                let diffMins = diffMs / 60000; 
+
+                // TRIGGER WINDOW: 1 min to 40 mins
+                if (diffMins > 0 && diffMins <= 40) {{
+                    let notifKey = `alert_v3_${{cls.Subject}}_${{cls.StartTime}}_${{now.toDateString()}}`;
+                    let alreadySent = sessionStorage.getItem(notifKey);
+
+                    if (!alreadySent) {{
+                        triggerAlert(cls.Subject, cls.Venue, Math.floor(diffMins));
+                        sessionStorage.setItem(notifKey, "true");
+                    }}
+                }}
+            }});
+        }}
+
+        function triggerAlert(subject, venue, mins) {{
+            // Play Sound
+            try {{
+                var audio = document.getElementById("alert-sound");
+                if(audio) audio.play();
+            }} catch(e) {{ console.log(e); }}
+
+            // Show Notification
+            if ("Notification" in window && Notification.permission === "granted") {{
+                const note = new Notification("📅 Class Alert: " + subject, {{
+                    body: `📍 ${{venue}}\\n⏰ Starts in ${{mins}} mins`,
+                    icon: ICON,
+                    requireInteraction: true,
+                    vibrate: [200, 100, 200]
+                }});
+                note.onclick = function() {{ window.focus(); this.close(); }};
+            }}
+        }}
+
+        // Run every 10 seconds
+        setInterval(checkTime, 10000);
+        setTimeout(checkTime, 1000);
+        </script>
+        """
+        # Inject the active script
+        st.components.v1.html(js_code, height=0, width=0)
     
-    # Inject the JS invisibly
-    st.components.v1.html(js_code, height=0, width=0)
-    
-    # Permission Button in Sidebar
+    # --- 3. SIDEBAR UI (TOGGLE BUTTONS) ---
     st.sidebar.markdown("""
-        <h3 style='
-            background: linear-gradient(45deg, #E0C3FC, #8EC5FC);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            font-size: 22px;
-            font-weight: 700;
-            margin-bottom: 10px;
-        '>
+        <h3 style='background: linear-gradient(45deg, #E0C3FC, #8EC5FC); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-size: 22px; font-weight: 700; margin-bottom: 10px;'>
             🔔 Notification Settings
         </h3>
     """, unsafe_allow_html=True)
-    if st.sidebar.button("Enable Class Alerts", key="enable_notif_formal_btn"):
-        st.components.v1.html(
-            "<script>Notification.requestPermission().then(perm => { if(perm==='granted'){ alert('You are now subscribed to class alerts!'); } });</script>", 
-            height=0, width=0
-        )
 
-# --- GOOGLE SHEETS PERSISTENCE ---
+    if st.session_state.alerts_enabled:
+        # --- STATE: ENABLED (Show Disable Button) ---
+        st.sidebar.markdown('<div id="js-status" style="font-size:11px; color:#27ae60; margin-bottom:10px; font-weight:600;">System Active</div>', unsafe_allow_html=True)
+        
+        if st.sidebar.button("🔕 Disable Class Alerts", key="disable_notif_btn", type="secondary"):
+            st.session_state.alerts_enabled = False
+            st.rerun() # Rerun to remove the JS component
+            
+    else:
+        # --- STATE: DISABLED (Show Enable Button) ---
+        st.sidebar.markdown('<div style="font-size:11px; color:grey; margin-bottom:10px;">Notifications are off</div>', unsafe_allow_html=True)
+        
+        if st.sidebar.button("🔔 Enable Class Alerts", key="enable_notif_btn", type="primary"):
+            st.session_state.alerts_enabled = True
+            
+            # Request Permissions IMMEDIATELY on click
+            st.components.v1.html(
+                "<script>Notification.requestPermission().then(perm => { if(perm!=='granted') alert('Please allow notifications in your browser settings.'); });</script>", 
+                height=0, width=0
+            )
+            st.rerun() # Rerun to inject the main JS
 def get_google_sheet():
     # Load credentials from Streamlit Secrets
     scope = ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive']
@@ -811,6 +816,7 @@ st.markdown("""
     Student Portal © 2026 • Built by <span style="color:#6a11cb; font-weight:700">IRONDEM2921 [AIML]</span>
 </div>
 """, unsafe_allow_html=True)
+
 
 
 
