@@ -344,7 +344,18 @@ def inject_notification_logic(daily_schedule):
     st.components.v1.html(js_code, height=0, width=0)
     
     # Permission Button in Sidebar
-    st.sidebar.markdown("### 🔔 Notification Settings")
+    st.sidebar.markdown("""
+        <h3 style='
+            background: linear-gradient(45deg, #E0C3FC, #8EC5FC);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            font-size: 22px;
+            font-weight: 700;
+            margin-bottom: 10px;
+        '>
+            🔔 Notification Settings
+        </h3>
+    """, unsafe_allow_html=True)
     if st.sidebar.button("Enable Class Alerts", key="enable_notif_formal_btn"):
         st.components.v1.html(
             "<script>Notification.requestPermission().then(perm => { if(perm==='granted'){ alert('You are now subscribed to class alerts!'); } });</script>", 
@@ -800,5 +811,6 @@ st.markdown("""
     Student Portal © 2026 • Built by <span style="color:#6a11cb; font-weight:700">IRONDEM2921 [AIML]</span>
 </div>
 """, unsafe_allow_html=True)
+
 
 
