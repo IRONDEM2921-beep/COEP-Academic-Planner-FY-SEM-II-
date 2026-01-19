@@ -112,6 +112,30 @@ div.stButton > button[kind="secondary"]:hover {
     background-color: #f3e5f5 !important;
 }
 
+div.stDownloadButton > button {
+    /* 1. The Colorful Gradient */
+    background: -webkit-linear-gradient(45deg, #FF512F, #DD2476, #1FA2FF) !important;
+    
+    /* 2. Clip background to text */
+    -webkit-background-clip: text !important;
+    -webkit-text-fill-color: transparent !important;
+    color: transparent !important;
+    
+    /* 3. White Button Background & Styling */
+    background-color: white !important;
+    border: 2px solid #DD2476 !important;
+    border-radius: 50px !important;
+    font-weight: 800 !important;
+    font-size: 16px !important;
+    padding: 10px 20px !important;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+}
+
+div.stDownloadButton > button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 15px rgba(0,0,0,0.15);
+}
+
 /* --- TIMETABLE GRID --- */
 .timetable-wrapper { overflow-x: auto; padding: 20px 5px 40px 5px; }
 table.custom-grid { width: 100%; min-width: 1000px; border-collapse: separate; border-spacing: 10px; }
@@ -806,3 +830,4 @@ st.markdown("""
     Student Portal © 2026 • Built by <span style="color:#6a11cb; font-weight:700">IRONDEM2921 [AIML]</span>
 </div>
 """, unsafe_allow_html=True)
+
