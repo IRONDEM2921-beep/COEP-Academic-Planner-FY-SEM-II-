@@ -112,29 +112,44 @@ div.stButton > button[kind="secondary"]:hover {
     background-color: #f3e5f5 !important;
 }
 
-/* --- UPDATED: DOWNLOAD BUTTON (LIGHT GRADIENT TEXT) --- */
-div.stDownloadButton > button {
-    /* 1. The Colorful Gradient - CHANGED TO LIGHTER COLORS */
-    background: -webkit-linear-gradient(45deg, #00f2fe, #4facfe, #ffffff) !important;
+/* --- FIX: SIDEBAR DOWNLOAD BUTTON VISIBILITY --- */
+/* Target specifically within the sidebar to avoid conflicts */
+[data-testid="stSidebar"] div.stDownloadButton button {
+    /* 1. Very Bright Gradient (White -> Bright Cyan) */
+    background-image: linear-gradient(90deg, #FFFFFF 0%, #00f2fe 100%) !important;
     
     /* 2. Clip background to text */
     -webkit-background-clip: text !important;
-    -webkit-text-fill-color: transparent !important;
-    color: transparent !important;
+    background-clip: text !important;
     
-    /* 3. Button Background & Styling */
-    background-color: transparent !important; /* Made transparent to blend with dark mode, or keep 'white' if preferred */
-    border: 2px solid #4facfe !important; /* Changed border to match light blue */
+    /* 3. Make text fill transparent so gradient shows through */
+    color: transparent !important;
+    -webkit-text-fill-color: transparent !important;
+    
+    /* 4. Button Border & Layout */
+    border: 2px solid #00f2fe !important; /* Bright Cyan Border */
+    background-color: transparent !important; /* Clear background */
     border-radius: 50px !important;
-    font-weight: 800 !important;
-    font-size: 16px !important;
-    padding: 10px 20px !important;
-    box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+    
+    /* 5. Font Styling for Max Visibility */
+    font-weight: 900 !important; /* Extra Bold */
+    font-size: 17px !important;
+    letter-spacing: 0.5px !important;
+    padding: 12px 20px !important;
 }
 
-div.stDownloadButton > button:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 15px rgba(79, 172, 254, 0.4); /* Updated shadow color */
+/* Hover Effect - Swap colors to indicate interaction */
+[data-testid="stSidebar"] div.stDownloadButton button:hover {
+    border-color: #FFFFFF !important;
+    background-image: linear-gradient(90deg, #00f2fe 0%, #FFFFFF 100%) !important;
+    box-shadow: 0 0 20px rgba(0, 242, 254, 0.6) !important; /* Glowing effect */
+    transform: scale(1.02);
+}
+
+/* FIX: Ensure inner text elements (like <p>) also accept the gradient */
+[data-testid="stSidebar"] div.stDownloadButton button * {
+    color: transparent !important;
+    -webkit-text-fill-color: transparent !important;
 }
 
 /* --- TIMETABLE GRID --- */
@@ -831,5 +846,6 @@ st.markdown("""
     Student Portal © 2026 • Built by <span style="color:#6a11cb; font-weight:700">IRONDEM2921 [AIML]</span>
 </div>
 """, unsafe_allow_html=True)
+
 
 
