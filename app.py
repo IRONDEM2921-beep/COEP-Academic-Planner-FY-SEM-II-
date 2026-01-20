@@ -218,12 +218,13 @@ table.custom-grid {{ width: 100%; min-width: 1000px; border-collapse: separate; 
 
 /* --- DROPDOWN (SELECTBOX) STYLING FIXES --- */
 
-/* 1. The selected value shown in the closed box */
-div[data-baseweb="select"] > div {{
-    background: -webkit-linear-gradient(45deg, #ff9a44, #fc6076) !important;
-    -webkit-background-clip: text !important;
-    -webkit-text-fill-color: transparent !important;
-    font-weight: 700 !important;
+/* 1. The selected value shown in the closed box (The "Red Border Box") */
+div[data-baseweb="select"] > div:first-child {{
+    /* FORCE BRIGHT RED TEXT */
+    color: #ff4b4b !important; 
+    font-weight: 800 !important;
+    -webkit-text-fill-color: #ff4b4b !important; /* Override potential gradients */
+    background: transparent !important;
 }}
 
 /* 2. The dropdown list container (popover) */
@@ -253,7 +254,7 @@ li[role="option"]:hover {{
 }}
 
 div[data-baseweb="select"] svg {{
-    fill: var(--text-color) !important;
+    fill: #ff4b4b !important; /* Make the arrow red too */
 }}
 </style>
 """, unsafe_allow_html=True)
@@ -738,12 +739,14 @@ def render_game_html(mis_user):
         goScreen.classList.remove('hidden'); void goScreen.offsetWidth; goScreen.classList.add('slide-up');
         document.getElementById('score-display').classList.add('fade-out');
 
-        // AUTO SAVE LOGIC
-        // We construct a URL param update.
-        // Important: We use window.parent to break out of iframe if allowed.
-        // Fallback: If blocked, we show the 'SAVE SCORE' link.
+        // AUTO SAVE LOGIC (IMPROVED for Reliability)
+        // 1. Get current URL
+        const url = new URL(window.parent.location.href);
+        // 2. Set search params
+        url.searchParams.set('score', score);
+        url.searchParams.set('user', USER_MIS);
         
-        const saveUrl = window.parent.location.pathname + '?score=' + score + '&user=' + USER_MIS;
+        const saveUrl = url.toString();
         const fallbackLink = document.getElementById('save-link');
         const autoMsg = document.getElementById('auto-msg');
         
@@ -826,10 +829,52 @@ def render_game_html(mis_user):
 # 7. MAIN APPLICATION
 # --------------------------------------------------
 
+# Ensure score processing happens FIRST
 if 'mis_no' not in st.session_state:
     st.session_state.mis_no = ""
 if 'attendance' not in st.session_state:
     st.session_state.attendance = load_attendance()
+
+# -------------------------------------------------------
+# AUTO-SAVE SCORE HANDLER (MOVED TO TOP FOR PRIORITY)
+# -------------------------------------------------------
+try:
+    # Retrieve Params (Streamlit > 1.30 syntax)
+    qp = st.query_params
+    new_score = qp.get("score")
+    user_check = qp.get("user")
+    
+    if new_score and user_check:
+        # Check against session state MIS (casted to string for safety)
+        if str(user_check).strip() == str(st.session_state.mis_no).strip():
+            score_val = int(new_score)
+            
+            # Fetch branch info if needed (mini-fetch to ensure we have context)
+            sub_dfs, sched_df, link_map = load_data()
+            _, _, name, branch = get_schedule(st.session_state.mis_no, sub_dfs, sched_df)
+            
+            # Find previous high score to see if it's a record
+            full_df_temp = get_leaderboard_data()
+            prev_high, _ = get_branch_highest(full_df_temp, branch)
+            
+            success, msg = update_leaderboard_score(name, branch, score_val)
+            
+            # IMPORTANT: Wait for Google Sheet API to catch up
+            time.sleep(2.0)
+            
+            if score_val > prev_high:
+                st.toast(f"🎉 New Personal Record: {score_val}!", icon="🏆")
+            else:
+                st.toast(f"Score saved: {score_val}", icon="✅")
+        else:
+            st.error(f"Security Warning: Score mismatch. User: {user_check} vs Session: {st.session_state.mis_no}")
+        
+        # Clear params immediately
+        st.query_params.clear()
+        # Force a rerun to clean URL and refresh leaderboard
+        st.rerun()
+except Exception as e:
+    pass
 
 sub_dfs, sched_df, link_map = load_data()
 
@@ -867,42 +912,6 @@ else:
         subs, table, name, branch = get_schedule(mis, sub_dfs, sched_df)
 
         if subs:
-            # -------------------------------------------------------
-            # AUTO-SAVE SCORE HANDLER (Query Param Check)
-            # -------------------------------------------------------
-            try:
-                # Retrieve Params (Streamlit > 1.30 syntax)
-                qp = st.query_params
-                new_score = qp.get("score")
-                user_check = qp.get("user")
-                
-                if new_score and user_check:
-                    if user_check == mis:
-                        score_val = int(new_score)
-                        # Find previous high score to see if it's a record
-                        # Note: We fetch current data before writing to compare
-                        full_df_temp = get_leaderboard_data()
-                        prev_high, _ = get_branch_highest(full_df_temp, branch)
-                        
-                        success, msg = update_leaderboard_score(name, branch, score_val)
-                        
-                        # IMPORTANT: Wait for Google Sheet API to catch up
-                        time.sleep(1.5)
-                        
-                        if score_val > prev_high:
-                            st.toast(f"🎉 New Personal Record: {score_val}!", icon="🏆")
-                        else:
-                            st.toast(f"Score saved: {score_val}", icon="✅")
-                    else:
-                        st.error("Security Warning: Score submission mismatch.")
-                    
-                    # Clear params immediately
-                    st.query_params.clear()
-                    # Force a rerun to fetch fresh data for the leaderboard display
-                    st.rerun()
-            except Exception as e:
-                pass
-
             # --- PROFILE ---
             st.markdown(f"""<div class="student-card"><div class="student-name">{name}</div><div class="student-meta">{branch} • MIS: {mis}</div></div>""", unsafe_allow_html=True)
 
