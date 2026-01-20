@@ -205,6 +205,31 @@ table.custom-grid {{ width: 100%; min-width: 1000px; border-collapse: separate; 
     -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 5px; 
 }}
 .student-meta {{ font-size: 15px; color: var(--text-color); opacity: 0.7; font-weight: 500; }}
+
+/* --- EXPANDER HEADER --- */
+[data-testid="stExpander"] summary p {
+    /* UPDATED: Brighter orange-to-red gradient for better visibility */
+    background: -webkit-linear-gradient(45deg, #ff9a44, #fc6076);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    font-size: 18px !important;
+    font-weight: 800 !important;
+}
+[data-testid="stExpander"] summary svg { fill: var(--text-color) !important; color: var(--text-color) !important; }
+
+/* --- SELECTBOX SELECTED VALUE --- */
+/* NEW: Target the container of the selected value in the selectbox */
+div[data-baseweb="select"] > div {
+    /* Apply the same bright gradient to the text */
+    background: -webkit-linear-gradient(45deg, #ff9a44, #fc6076) !important;
+    -webkit-background-clip: text !important;
+    -webkit-text-fill-color: transparent !important;
+    font-weight: 700 !important; /* Make it bolder for better visibility */
+}
+/* Ensure the icon remains its original color or a visible one */
+div[data-baseweb="select"] svg {
+    fill: var(--text-color) !important;
+}
 </style>
 """, unsafe_allow_html=True)
 
