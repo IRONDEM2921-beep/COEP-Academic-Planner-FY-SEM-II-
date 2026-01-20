@@ -10,221 +10,286 @@ from datetime import datetime, timedelta, date
 from difflib import SequenceMatcher
 
 # --------------------------------------------------
-# 1. PAGE CONFIGURATION & CONSTANTS
+# 1. PAGE CONFIGURATION & STATE INITIALIZATION
 # --------------------------------------------------
 st.set_page_config(page_title="Student Timetable", page_icon="✨", layout="wide")
 
+# Initialize Theme State
+if 'theme' not in st.session_state:
+    st.session_state.theme = 'light'
+
+def toggle_theme():
+    st.session_state.theme = 'dark' if st.session_state.theme == 'light' else 'light'
+
+# --------------------------------------------------
+# 2. CONSTANTS & DATES
+# --------------------------------------------------
 DATA_FOLDER = "data"
 TIMETABLE_FILE = "timetable_schedule.xlsx"
 ATTENDANCE_FILE = "attendance_data.json"
-
-# SEMESTER DATES
 SEMESTER_START = date(2026, 1, 12)
 SEMESTER_END = date(2026, 5, 7)
 
 # --------------------------------------------------
-# 2. GLOBAL STYLES
+# 3. DYNAMIC THEME STYLING
 # --------------------------------------------------
-st.markdown("""
+
+# Define Color Palettes
+light_theme = {
+    "bg_color": "#f1f0f6",
+    "text_color": "#2c3e50",
+    "card_bg": "#ffffff",
+    "card_shadow": "rgba(0,0,0,0.05)",
+    "table_header_text": "#2c3e50",
+    "table_row_hover": "#f8f9fa",
+    "secondary_btn_bg": "#ffffff",
+    "secondary_btn_text": "#6a11cb",
+    "sidebar_bg": "#ffffff",
+    "metric_bg_base": "#ffffff",
+    "footer_color": "#000000"
+}
+
+dark_theme = {
+    "bg_color": "#0e1117",           # Streamlit default dark
+    "text_color": "#e0e0e0",         # Light grey text
+    "card_bg": "#1e1e1e",            # Dark card background
+    "card_shadow": "rgba(0,0,0,0.5)",
+    "table_header_text": "#ffffff",  # White text on gradients
+    "table_row_hover": "#2d2d2d",
+    "secondary_btn_bg": "#1e1e1e",
+    "secondary_btn_text": "#a18cd1", # Lighter purple for dark mode
+    "sidebar_bg": "#161b22",
+    "metric_bg_base": "#1e1e1e",
+    "footer_color": "#888888"
+}
+
+# Select current palette
+current_theme = light_theme if st.session_state.theme == 'light' else dark_theme
+
+# Generate CSS
+st.markdown(f"""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap');
 
-/* BACKGROUND */
-.stApp { background-color: #f1f0f6; }
+/* --- CSS VARIABLES FOR THEME SWITCHING --- */
+:root {{
+    --bg-color: {current_theme['bg_color']};
+    --text-color: {current_theme['text_color']};
+    --card-bg: {current_theme['card_bg']};
+    --card-shadow: {current_theme['card_shadow']};
+    --table-header-text: {current_theme['table_header_text']};
+    --table-row-hover: {current_theme['table_row_hover']};
+    --sec-btn-bg: {current_theme['secondary_btn_bg']};
+    --sec-btn-text: {current_theme['secondary_btn_text']};
+    --sidebar-bg: {current_theme['sidebar_bg']};
+    --metric-bg-base: {current_theme['metric_bg_base']};
+    --footer-color: {current_theme['footer_color']};
+}}
 
-/* GLOBAL FONT */
-html, body, [class*="css"], .stMarkdown, div, span, p {
+/* BACKGROUND & GLOBAL FONT */
+.stApp {{ background-color: var(--bg-color); }}
+
+html, body, [class*="css"], .stMarkdown, div, span, p, h1, h2, h3, h4, h5, h6 {{
     font-family: 'Poppins', sans-serif;
-    color: #2c3e50;
-}
+    color: var(--text-color);
+}}
 
-/* --- FIX 1: DARK ROUNDED INPUT BOX (For Text Input) --- */
-/* Target the container */
-div[data-baseweb="input"] {
-    border: none; /* Remove default border */
-    border-radius: 50px !important; /* Fully Rounded */
-    background-color: #262730; /* Dark background color */
+/* --- SIDEBAR TOGGLE BUTTON --- */
+.theme-btn {{
+    border: 1px solid var(--text-color);
+    background: transparent;
+    color: var(--text-color);
+    padding: 5px 10px;
+    border-radius: 15px;
+    cursor: pointer;
+    font-size: 12px;
+    margin-bottom: 10px;
+}}
+
+/* --- FIX: INPUT BOXES (Keep dark for contrast in both modes or adapt) --- */
+div[data-baseweb="input"] {{
+    border: none;
+    border-radius: 50px !important;
+    background-color: #262730; /* Always dark input for consistency */
     padding: 8px 20px;
-    box-shadow: inset 0 2px 4px rgba(0,0,0,0.5); /* Inner shadow for depth */
-    color: white !important; /* White text */
-}
-
-/* Target the actual input field inside */
-div[data-baseweb="input"] input {
+    box-shadow: inset 0 2px 4px rgba(0,0,0,0.5);
     color: white !important;
-    caret-color: white; /* White cursor */
-}
-
-/* Focus state - optional purple glow */
-div[data-baseweb="input"]:focus-within {
+}}
+div[data-baseweb="input"] input {{
+    color: white !important;
+    caret-color: white;
+}}
+div[data-baseweb="input"]:focus-within {{
     box-shadow: 0 0 0 2px #6a11cb, inset 0 2px 4px rgba(0,0,0,0.5) !important;
-}
-
-
-/* --- FIX: DATE PICKER VISIBILITY (WHITE TEXT) --- */
-/* The container for the date picker often inherits the dark style, so we force white text */
-div[data-testid="stDateInput"] input {
-    color: #ffffff !important; /* Force White Text */
+}}
+div[data-testid="stDateInput"] input {{
+    color: #ffffff !important;
     font-weight: 600;
-}
+}}
 
-/* --- EXPANDER HEADER (ALLOCATED SUBJECTS) - LIGHT BLUE GRADIENT --- */
-[data-testid="stExpander"] summary p {
+/* --- EXPANDER HEADER --- */
+[data-testid="stExpander"] summary p {{
     background: -webkit-linear-gradient(45deg, #4facfe, #00f2fe);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     font-size: 18px !important;
     font-weight: 800 !important;
-}
+}}
+/* Fix for arrow color in dark mode */
+[data-testid="stExpander"] summary svg {{
+    fill: var(--text-color) !important;
+    color: var(--text-color) !important;
+}}
 
 /* --- BUTTONS --- */
 
-/* --- FIX 2: MARK BUTTON TEXT COLOR --- */
-/* Primary Button (Mark) -> Purple Gradient Background, WHITE Text */
-div.stButton > button[kind="primary"] {
+/* Primary (Mark) - Always Purple/Blue Gradient */
+div.stButton > button[kind="primary"] {{
     background: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%) !important;
     border: none !important;
     border-radius: 50px !important;
     font-weight: 600;
     box-shadow: 0 4px 10px rgba(106, 17, 203, 0.2);
     transition: transform 0.2s;
-}
-/* FORCE WHITE TEXT on the button and any internal elements */
-div.stButton > button[kind="primary"],
-div.stButton > button[kind="primary"] * {
+}}
+div.stButton > button[kind="primary"] * {{
     color: #ffffff !important; 
-}
-
-div.stButton > button[kind="primary"]:hover {
+}}
+div.stButton > button[kind="primary"]:hover {{
     transform: translateY(-2px);
     box-shadow: 0 6px 15px rgba(106, 17, 203, 0.3);
-}
+}}
 
-/* Secondary Button (Change User / Undo) -> White BG, Purple Text */
-div.stButton > button[kind="secondary"] {
-    background-color: white !important;
-    color: #6a11cb !important; 
+/* Secondary (Undo/Change User) - Adaptive */
+div.stButton > button[kind="secondary"] {{
+    background-color: var(--sec-btn-bg) !important;
+    color: var(--sec-btn-text) !important; 
     border: 2px solid #6a11cb !important;
     border-radius: 50px !important;
     font-weight: 600;
-}
-div.stButton > button[kind="secondary"]:hover {
-    background-color: #f3e5f5 !important;
-}
+}}
+div.stButton > button[kind="secondary"]:hover {{
+    background-color: var(--table-row-hover) !important;
+    border-color: #8e44ad !important;
+}}
 
-/* --- FIX: SIDEBAR DOWNLOAD BUTTON VISIBILITY --- */
-/* Target specifically within the sidebar to avoid conflicts */
-[data-testid="stSidebar"] div.stDownloadButton button {
-    /* 1. Very Bright Gradient (White -> Bright Cyan) */
+/* --- SIDEBAR DOWNLOAD BUTTON --- */
+[data-testid="stSidebar"] div.stDownloadButton button {{
     background-image: linear-gradient(90deg, #FFFFFF 0%, #00f2fe 100%) !important;
-    
-    /* 2. Clip background to text */
     -webkit-background-clip: text !important;
     background-clip: text !important;
-    
-    /* 3. Make text fill transparent so gradient shows through */
     color: transparent !important;
     -webkit-text-fill-color: transparent !important;
-    
-    /* 4. Button Border & Layout */
-    border: 2px solid #00f2fe !important; /* Bright Cyan Border */
-    background-color: transparent !important; /* Clear background */
+    border: 2px solid #00f2fe !important;
+    background-color: transparent !important;
     border-radius: 50px !important;
-    
-    /* 5. Font Styling for Max Visibility */
-    font-weight: 900 !important; /* Extra Bold */
+    font-weight: 900 !important;
     font-size: 17px !important;
-    letter-spacing: 0.5px !important;
     padding: 12px 20px !important;
-}
-
-/* Hover Effect - Swap colors to indicate interaction */
-[data-testid="stSidebar"] div.stDownloadButton button:hover {
+}}
+[data-testid="stSidebar"] div.stDownloadButton button:hover {{
     border-color: #FFFFFF !important;
     background-image: linear-gradient(90deg, #00f2fe 0%, #FFFFFF 100%) !important;
-    box-shadow: 0 0 20px rgba(0, 242, 254, 0.6) !important; /* Glowing effect */
+    box-shadow: 0 0 20px rgba(0, 242, 254, 0.6) !important;
     transform: scale(1.02);
-}
-
-/* FIX: Ensure inner text elements (like <p>) also accept the gradient */
-[data-testid="stSidebar"] div.stDownloadButton button * {
-    color: transparent !important;
-    -webkit-text-fill-color: transparent !important;
-}
+}}
 
 /* --- TIMETABLE GRID --- */
-.timetable-wrapper { overflow-x: auto; padding: 20px 5px 40px 5px; }
-table.custom-grid { width: 100%; min-width: 1000px; border-collapse: separate; border-spacing: 10px; }
+.timetable-wrapper {{ overflow-x: auto; padding: 20px 5px 40px 5px; }}
+table.custom-grid {{ width: 100%; min-width: 1000px; border-collapse: separate; border-spacing: 10px; }}
 
-.custom-grid th {
+.custom-grid th {{
     background: linear-gradient(90deg, #8EC5FC 0%, #E0C3FC 100%);
-    color: #2c3e50; font-weight: 800; padding: 15px; border-radius: 15px;
+    color: #2c3e50; /* Always dark text on these light pastel gradients */
+    font-weight: 800; padding: 15px; border-radius: 15px;
     text-align: center; font-size: 18px; box-shadow: 0 4px 10px rgba(142, 197, 252, 0.4); border: none;
     text-transform: uppercase; letter-spacing: 1px;
-}
-.custom-grid th:first-child { background: transparent; box-shadow: none; width: 140px; }
+}}
+.custom-grid th:first-child {{ background: transparent; box-shadow: none; width: 140px; color: var(--text-color); }}
 
-.custom-grid td:first-child {
+.custom-grid td:first-child {{
     background: linear-gradient(90deg, #8EC5FC 0%, #E0C3FC 100%);
     border-radius: 15px; font-size: 14px; font-weight: 800; color: #2c3e50;
     text-align: center; vertical-align: middle; box-shadow: 0 4px 10px rgba(142, 197, 252, 0.4);
     min-width: 140px; white-space: nowrap;
-}
-.custom-grid td { vertical-align: top; height: 110px; padding: 0; border: none; }
+}}
+.custom-grid td {{ vertical-align: top; height: 110px; padding: 0; border: none; }}
+.time-label {{ color: #2c3e50 !important; }} /* Force dark text on the time label gradient */
 
 /* CARD & HOVER EFFECTS */
-.class-card {
+.class-card {{
     height: 100%; width: 100%; padding: 12px; box-sizing: border-box;
     display: flex; flex-direction: column; justify-content: center;
     border-radius: 18px; transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
     position: relative; cursor: default;
-}
-.class-card.filled {
-    color: #2c3e50; border: 1px solid rgba(255,255,255,0.4);
+}}
+.class-card.filled {{
+    color: #2c3e50; /* Always dark text inside colored cards */
+    border: 1px solid rgba(255,255,255,0.4);
     box-shadow: 0 4px 6px rgba(0,0,0,0.05);
-}
-.class-card.filled:hover {
+}}
+.class-card.filled:hover {{
     transform: translateY(-5px) scale(1.03);
     box-shadow: 0 15px 30px rgba(0,0,0,0.15);
     z-index: 100;
-}
-.type-empty {
-    background: rgba(255, 255, 255, 0.5);
+}}
+.type-empty {{
+    background: var(--card-bg);
     border: 2px dashed rgba(160, 160, 200, 0.2); border-radius: 18px;
-}
-.sub-title { font-weight: 700; font-size: 13px; margin-bottom: 4px; }
-.sub-meta { font-size: 11px; opacity: 0.9; }
-.batch-badge {
+}}
+.sub-title {{ font-weight: 700; font-size: 13px; margin-bottom: 4px; }}
+.sub-meta {{ font-size: 11px; opacity: 0.9; }}
+.batch-badge {{
     background: rgba(255,255,255,0.6); padding: 3px 8px; border-radius: 10px;
     font-size: 10px; font-weight: 700; text-transform: uppercase; display: inline-block;
-    margin-bottom: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-}
+    margin-bottom: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); color: #2c3e50;
+}}
 
 /* ATTENDANCE CARDS */
-.metric-card {
-    background: white; border-radius: 20px; padding: 20px;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.05); text-align: center;
-    border: 1px solid #f0f0f0; height: 100%; transition: transform 0.2s;
-}
-.metric-card:hover { transform: translateY(-5px); }
-.metric-value {
+.metric-card {{
+    background: var(--card-bg); /* Adaptive */
+    border-radius: 20px; padding: 20px;
+    box-shadow: 0 4px 15px var(--card-shadow); text-align: center;
+    border: 1px solid rgba(128, 128, 128, 0.1); 
+    height: 100%; transition: transform 0.2s;
+}}
+.metric-card:hover {{ transform: translateY(-5px); }}
+.metric-value {{
     font-size: 32px; font-weight: 800;
     background: -webkit-linear-gradient(45deg, #6a11cb, #2575fc);
     -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-}
-.daily-card {
-    background: white; border-radius: 18px; padding: 20px; margin-bottom: 15px;
-    box-shadow: 0 4px 10px rgba(0,0,0,0.05); display: flex; justify-content: space-between;
+}}
+.metric-title {{ color: var(--text-color); font-weight: 600; }}
+.metric-sub {{ color: var(--text-color); opacity: 0.7; font-size: 12px; }}
+
+.daily-card {{
+    background: var(--card-bg); /* Adaptive */
+    border-radius: 18px; padding: 20px; margin-bottom: 15px;
+    box-shadow: 0 4px 10px var(--card-shadow); 
+    display: flex; justify-content: space-between;
     align-items: center; border-left: 6px solid #6a11cb;
-}
-.student-card { background: #ffffff; border-radius: 24px; padding: 30px; text-align: center; margin-bottom: 30px; box-shadow: 0 10px 25px rgba(106, 17, 203, 0.1); }
-.student-name { font-size: 28px; font-weight: 700; background: -webkit-linear-gradient(45deg, #6a11cb, #2575fc); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 5px; }
-.student-meta { font-size: 15px; color: #7f8c8d; font-weight: 500; }
+}}
+.daily-info h4 {{ color: var(--text-color); margin: 0; font-weight: 700; }}
+.daily-info p {{ color: var(--text-color); opacity: 0.8; margin: 0; font-size: 14px; }}
+
+.student-card {{ 
+    background: var(--card-bg); 
+    border-radius: 24px; padding: 30px; text-align: center; 
+    margin-bottom: 30px; 
+    box-shadow: 0 10px 25px rgba(106, 17, 203, 0.1); 
+}}
+.student-name {{ 
+    font-size: 28px; font-weight: 700; 
+    background: -webkit-linear-gradient(45deg, #6a11cb, #2575fc); 
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; 
+    margin-bottom: 5px; 
+}}
+.student-meta {{ font-size: 15px; color: var(--text-color); opacity: 0.7; font-weight: 500; }}
 </style>
 """, unsafe_allow_html=True)
 
 # --------------------------------------------------
-# 3. HELPERS
+# 4. HELPERS
 # --------------------------------------------------
 SUBJECT_GRADIENTS = [
     "linear-gradient(135deg, #a18cd1 0%, #fbc2eb 100%)", "linear-gradient(135deg, #84fab0 0%, #8fd3f4 100%)",
@@ -298,80 +363,51 @@ def map_to_slot(time_str, slots):
 # --- GOOGLE SHEETS PERSISTENCE ---
 
 def generate_master_ics(weekly_schedule, semester_end_date):
-    """
-    Combines ALL classes into a single ICS file with weekly recurrence.
-    """
-    # Map Day Name to ICS format
     day_map = {
         "Monday": "MO", "Tuesday": "TU", "Wednesday": "WE",
         "Thursday": "TH", "Friday": "FR", "Saturday": "SA", "Sunday": "SU"
     }
-    
-    # Header for the ICS file
     ics_lines = [
-        "BEGIN:VCALENDAR",
-        "VERSION:2.0",
-        "PRODID:-//StudentPortal//MasterTimetable//EN",
-        "CALSCALE:GREGORIAN",
-        "METHOD:PUBLISH"
+        "BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//StudentPortal//MasterTimetable//EN",
+        "CALSCALE:GREGORIAN", "METHOD:PUBLISH"
     ]
-    
-    # We use today as the baseline to calculate the next occurrence of each class
     today = date.today()
     days_list = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 
     for cls in weekly_schedule:
         try:
-            # 1. Calculate the next occurrence of this specific day
             target_day_name = cls['Day'] 
             if target_day_name not in days_list: continue
 
             target_idx = days_list.index(target_day_name)
             current_idx = today.weekday()
             
-            # Calculate days ahead to find the first class date
             if target_idx >= current_idx:
                 days_ahead = target_idx - current_idx
             else:
                 days_ahead = 7 - (current_idx - target_idx)
                 
             start_date = today + timedelta(days=days_ahead)
-            
-            # 2. Parse Times
             start_h, start_m = map(int, cls['StartTime'].split(':'))
             dt_start = datetime.combine(start_date, datetime.min.time()).replace(hour=start_h, minute=start_m)
             
-            # Use 'Duration' from your data, default to 1 hour if missing
             dur = cls.get('Duration', 1)
             dt_end = dt_start + timedelta(hours=dur)
             
-            # 3. Format Strings for ICS
             fmt = "%Y%m%dT%H%M%S"
             dt_start_str = dt_start.strftime(fmt)
             dt_end_str = dt_end.strftime(fmt)
-            
-            # Recur until Semester End
             until_str = semester_end_date.strftime("%Y%m%dT235959")
             rrule_day = day_map.get(target_day_name, "MO")
             
-            # 4. Create Event Block
             event_block = [
-                "BEGIN:VEVENT",
-                f"SUMMARY:{cls['Subject']} ({cls['Type']})",
-                f"DTSTART:{dt_start_str}",
-                f"DTEND:{dt_end_str}",
+                "BEGIN:VEVENT", f"SUMMARY:{cls['Subject']} ({cls['Type']})",
+                f"DTSTART:{dt_start_str}", f"DTEND:{dt_end_str}",
                 f"RRULE:FREQ=WEEKLY;BYDAY={rrule_day};UNTIL={until_str}",
-                f"LOCATION:{cls['Venue']}",
-                f"DESCRIPTION:Weekly {cls['Type']} session.",
-                "BEGIN:VALARM",
-                "TRIGGER:-PT15M",
-                "ACTION:DISPLAY",
-                "DESCRIPTION:Reminder",
-                "END:VALARM",
-                "END:VEVENT"
+                f"LOCATION:{cls['Venue']}", f"DESCRIPTION:Weekly {cls['Type']} session.",
+                "BEGIN:VALARM", "TRIGGER:-PT15M", "ACTION:DISPLAY", "DESCRIPTION:Reminder", "END:VALARM", "END:VEVENT"
             ]
             ics_lines.extend(event_block)
-            
         except Exception as e:
             continue
 
@@ -380,39 +416,27 @@ def generate_master_ics(weekly_schedule, semester_end_date):
 
 
 def get_google_sheet():
-    # Load credentials from Streamlit Secrets
     scope = ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive']
     creds = Credentials.from_service_account_info(st.secrets["gcp_service_account"], scopes=scope)
     client = gspread.authorize(creds)
-    
-    # Open the sheet by URL (Paste your URL in secrets later, or hardcode it here if private)
     sheet_url = st.secrets["private_sheet_url"] 
     return client.open_by_url(sheet_url).sheet1
 
 def load_attendance():
     try:
         sheet = get_google_sheet()
-        # Get all IDs listed in Column 1 (A)
-        # We assume Column A contains the 'cls_id' strings
         data = sheet.col_values(1)
-        # Convert list to dictionary format expected by the app
         return {cls_id: True for cls_id in data if cls_id}
     except Exception as e:
         st.error(f"Database Connection Error: {e}")
         return {}
 
 def update_attendance_in_sheet(cls_id, action):
-    """
-    Directly updates the sheet without rewriting everything.
-    action: 'add' or 'remove'
-    """
     try:
         sheet = get_google_sheet()
         if action == "add":
-            # Append the ID to the next available row in Column A
             sheet.append_row([cls_id])
         elif action == "remove":
-            # Find the cell with the ID and delete that row/cell
             cell = sheet.find(cls_id)
             if cell:
                 sheet.delete_rows(cell.row)
@@ -420,7 +444,7 @@ def update_attendance_in_sheet(cls_id, action):
         st.warning(f"Could not sync with cloud: {e}")
 
 # --------------------------------------------------
-# 4. DATA LOADING & LOGIC
+# 5. DATA LOADING & LOGIC
 # --------------------------------------------------
 @st.cache_data
 def load_data():
@@ -458,7 +482,6 @@ def get_schedule(mis, sub_dfs, sched_df):
     name, branch = "Unknown", "Unknown"
     target_mis = clean_mis(mis)
     
-    # 1. FIND ALLOCATED SUBJECTS
     for df in sub_dfs:
         mis_col = next((c for c in df.columns if "MIS" in c.upper()), None)
         if not mis_col: continue
@@ -485,7 +508,6 @@ def get_schedule(mis, sub_dfs, sched_df):
                     "Batch": str(row[batch_col]) if batch_col else ""
                 })
 
-    # 2. FILTER MASTER TIMETABLE
     timetable = []
     if sched_df is not None and found_subs:
         cols = sched_df.columns
@@ -561,29 +583,40 @@ def render_subject_html(subjects, link_map):
     html_parts = []
     html_parts.append("""
     <style>
-    /* CHANGED: overflow: hidden -> overflow-x: auto for mobile scrolling */
     .sub-alloc-wrapper { 
         font-family: 'Poppins', sans-serif; 
         margin-top: 10px; 
         border-radius: 12px; 
-        overflow-x: auto;  /* ALLOWS SCROLLING */
+        overflow-x: auto; 
         border: none; 
-        box-shadow: 0 4px 20px rgba(0,0,0,0.05); 
-        background: white; 
+        box-shadow: 0 4px 20px var(--card-shadow); 
+        background: var(--card-bg); 
     }
-    
-    /* ADDED: min-width ensures the table doesn't get squashed */
     table.sub-alloc-table { 
         width: 100%; 
-        min-width: 600px; /* Forces scroll on small screens */
+        min-width: 600px; 
         border-collapse: collapse; 
-        background: white; 
+        background: var(--card-bg); 
     }
     
-    .sub-alloc-table thead th { background: linear-gradient(90deg, #a18cd1 0%, #fbc2eb 100%); color: white; padding: 18px; font-size: 17px; font-weight: 700; text-align: left; white-space: nowrap; }
-    .sub-alloc-table tbody td { padding: 16px; font-size: 16px; color: #2c3e50; border-bottom: 1px solid #f0f0f0; background: #ffffff; vertical-align: middle; transition: all 0.2s; white-space: nowrap; }
+    .sub-alloc-table thead th { 
+        background: linear-gradient(90deg, #a18cd1 0%, #fbc2eb 100%); 
+        color: white; /* Always white on gradient */
+        padding: 18px; font-size: 17px; font-weight: 700; text-align: left; white-space: nowrap; 
+    }
+    .sub-alloc-table tbody td { 
+        padding: 16px; font-size: 16px; 
+        color: var(--text-color); 
+        border-bottom: 1px solid rgba(128,128,128,0.1); 
+        background: var(--card-bg); 
+        vertical-align: middle; transition: all 0.2s; white-space: nowrap; 
+    }
     
-    .sub-alloc-table tbody tr:hover td { background-color: #f8f9fa; transform: scale(1.005); color: #6a11cb; cursor: default; }
+    .sub-alloc-table tbody tr:hover td { 
+        background-color: var(--table-row-hover); 
+        transform: scale(1.005); 
+        color: #6a11cb; cursor: default; 
+    }
 
     .drive-btn { background: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%); color: white !important; padding: 8px 16px; border-radius: 50px; text-decoration: none; font-size: 13px; font-weight: 600; display: inline-block; transition: 0.2s; }
     .drive-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 15px rgba(37, 117, 252, 0.3); }
@@ -594,7 +627,7 @@ def render_subject_html(subjects, link_map):
     
     for sub in subjects:
         link = link_map.get(clean_text(sub.get('Subject')), "#")
-        link_html = f'<a href="{link}" target="_blank" class="drive-btn">📂 Open Drive</a>' if link != "#" else "<span style='color:#ccc'>No Link</span>"
+        link_html = f'<a href="{link}" target="_blank" class="drive-btn">📂 Open Drive</a>' if link != "#" else "<span style='color:#aaa'>No Link</span>"
         html_parts.append(f"<tr><td>{sub.get('Subject')}</td><td>{sub.get('Batch')}</td><td>{sub.get('Division')}</td><td>{link_html}</td></tr>")
     
     html_parts.append("</tbody></table></div>")
@@ -621,7 +654,7 @@ def calculate_semester_totals(timetable_entries):
     return totals
 
 # --------------------------------------------------
-# 5. MAIN APPLICATION
+# 6. MAIN APPLICATION
 # --------------------------------------------------
 
 if 'mis_no' not in st.session_state:
@@ -631,12 +664,20 @@ if 'attendance' not in st.session_state:
 
 sub_dfs, sched_df, link_map = load_data()
 
-# HEADER
-st.markdown("""
-    <h1 style='text-align: left; background: linear-gradient(to right, #6a11cb, #2575fc); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-size: 3em; font-weight: 800; padding-top:10px;'>
-    ✨ Smart Semester Timetable
-    </h1>
-""", unsafe_allow_html=True)
+# HEADER with Theme Toggle
+h1_col, toggle_col = st.columns([8, 1])
+with h1_col:
+    st.markdown("""
+        <h1 style='text-align: left; background: linear-gradient(to right, #6a11cb, #2575fc); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-size: 3em; font-weight: 800; padding-top:10px;'>
+        ✨ Smart Semester Timetable
+        </h1>
+    """, unsafe_allow_html=True)
+with toggle_col:
+    st.write("") # Spacer
+    st.write("") # Spacer
+    icon = "🌙" if st.session_state.theme == "light" else "☀️"
+    if st.button(icon, on_click=toggle_theme, key="theme_toggle", help="Toggle Dark Mode"):
+        pass
 
 if not sub_dfs or sched_df is None:
     st.error(f"Missing files in '{DATA_FOLDER}'.")
@@ -672,25 +713,21 @@ else:
             st.markdown("""<h3 style="font-size: 28px; font-weight: 700; margin: 20px 0; background: linear-gradient(to right, #6a11cb, #fbc2eb); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">🗓️ Weekly Schedule</h3>""", unsafe_allow_html=True)
             
             if table:
-                
-
-                # --- NEW: MASTER SYNC BUTTON ---
+                # --- MASTER SYNC BUTTON ---
                 st.sidebar.markdown("---")
-                st.sidebar.markdown("""
+                st.sidebar.markdown(f"""
                     <h3 style='background: linear-gradient(45deg, #a18cd1, #fbc2eb); 
                     -webkit-background-clip: text; -webkit-text-fill-color: transparent; 
                     font-weight: 700; margin-bottom: 5px;'>
                         📲 Calendar Sync
                     </h3>
-                    <p style='font-size: 11px; color: gray; margin-bottom: 10px;'>
+                    <p style='font-size: 11px; color: var(--text-color); margin-bottom: 10px;'>
                     One click to add your entire semester schedule to your phone.
                     </p>
                 """, unsafe_allow_html=True)
             
-                # Generate the Master File using the helper function
                 master_ics_data = generate_master_ics(table, SEMESTER_END)
             
-                # The Download Button
                 st.sidebar.download_button(
                     label="📥 Sync Full Semester",
                     data=master_ics_data,
@@ -702,26 +739,12 @@ else:
             else:
                 st.warning("No schedule found.")
 
-            # --- ALLOCATED SUBJECTS (Header Color: Light Blue) ---
+            # --- ALLOCATED SUBJECTS ---
             with st.expander("Subject Allocation List", expanded=False):
                 st.markdown(render_subject_html(subs, link_map), unsafe_allow_html=True)
             
-            # CSS to handle the expander title gradient (Light Blue)
-            st.markdown("""
-            <style>
-            [data-testid="stExpander"] summary { color: transparent; }
-            [data-testid="stExpander"] summary p {
-                 background: -webkit-linear-gradient(45deg, #4facfe, #00f2fe); /* Light Blue */
-                -webkit-background-clip: text;
-                -webkit-text-fill-color: transparent;
-                font-weight: 800;
-            }
-            </style>
-            """, unsafe_allow_html=True)
-
-
             # --- 2. ATTENDANCE TRACKER ---
-            st.markdown("""<hr style="border:1px solid #e0e0e0; margin: 40px 0;">""", unsafe_allow_html=True)
+            st.markdown("""<hr style="border:1px solid rgba(128,128,128,0.2); margin: 40px 0;">""", unsafe_allow_html=True)
             st.markdown("""<h3 style="font-size: 28px; font-weight: 700; margin-bottom: 20px; background: linear-gradient(to right, #6a11cb, #fbc2eb); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">✅ Attendance Tracker</h3>""", unsafe_allow_html=True)
 
             col_date, col_daily_list = st.columns([1, 3])
@@ -746,7 +769,7 @@ else:
                         cls_id = f"{mis}_{selected_date}_{cls['Subject']}_{cls['Type']}_{cls['StartTime']}"
                         is_present = st.session_state.attendance.get(cls_id, False)
                         
-                        border_color = "#6a11cb" if is_present else "#e0e0e0"
+                        border_color = "#6a11cb" if is_present else "rgba(128,128,128,0.2)"
                         
                         c_info, c_action = st.columns([4, 1])
                         with c_info:
@@ -759,28 +782,22 @@ else:
                             </div>
                             """, unsafe_allow_html=True)
                         with c_action:
-                            # Primary button now has White Text by CSS force
                             btn_label = "Mark ✓" if not is_present else "Undo ✕"
                             btn_type = "primary" if not is_present else "secondary"
                             
                             if st.button(btn_label, key=cls_id, type=btn_type, use_container_width=True):
                                 if is_present:
-                                    # Optimistic UI update (update local state immediately)
                                     del st.session_state.attendance[cls_id]
-                                    # Sync with Google Sheets
                                     update_attendance_in_sheet(cls_id, "remove")
                                 else:
-                                    # Optimistic UI update
                                     st.session_state.attendance[cls_id] = True
-                                    # Sync with Google Sheets
                                     update_attendance_in_sheet(cls_id, "add")
-    
                                 st.rerun()
                             
                             
 
             # --- 3. CALCULATOR ---
-            st.markdown("""<hr style="border:1px solid #e0e0e0; margin: 40px 0;">""", unsafe_allow_html=True)
+            st.markdown("""<hr style="border:1px solid rgba(128,128,128,0.2); margin: 40px 0;">""", unsafe_allow_html=True)
             st.markdown("""<h3 style="font-size: 28px; font-weight: 700; margin-bottom: 20px; background: linear-gradient(to right, #6a11cb, #fbc2eb); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">📊 Attendance Calculator</h3>""", unsafe_allow_html=True)
             
             total_possible = calculate_semester_totals(table)
@@ -802,32 +819,31 @@ else:
                 needed = req_for_75 - attended
                 
                 border_grad = "linear-gradient(135deg, #6a11cb, #2575fc)"
-                bg_color = "#f0f0f0"
-                msg_color = "#27ae60"
+                # Adaptive background for metrics
+                is_dark = st.session_state.theme == 'dark'
+                bg_color = "rgba(106, 17, 203, 0.05)" if is_dark else "#f0f0f0"
+                msg_color = "#2ecc71"
 
                 if percentage < 60:
                     border_grad = "linear-gradient(135deg, #ff9a9e, #fecfef)" 
-                    bg_color = "#fff5f5"
-                    msg_color = "#c0392b"
+                    bg_color = "rgba(255, 0, 0, 0.05)" if is_dark else "#fff5f5"
+                    msg_color = "#e74c3c"
                 elif percentage < 75:
                     border_grad = "linear-gradient(135deg, #f6d365, #fda085)"
-                    bg_color = "#fffdf5"
-                    msg_color = "#d35400"
-                else:
-                    border_grad = "linear-gradient(135deg, #a18cd1, #fbc2eb)"
-                    bg_color = "#f5fff5"
+                    bg_color = "rgba(255, 165, 0, 0.05)" if is_dark else "#fffdf5"
+                    msg_color = "#e67e22"
 
                 with row_cols[col_idx % 3]:
                     st.markdown(f"""
                     <div class="metric-card" style="border-top: 5px solid transparent; border-image: {border_grad} 1; background-color: {bg_color};">
-                        <div class="metric-title">{subject_name} <br> <span style="font-size:10px; color:#aaa">({subject_type})</span></div>
+                        <div class="metric-title">{subject_name} <br> <span style="font-size:10px; opacity:0.7">({subject_type})</span></div>
                         <div class="metric-value">{percentage:.1f}%</div>
                         <div class="metric-sub">{attended} / {total_count} Sessions</div>
                     </div>
                     """, unsafe_allow_html=True)
                     
                     if needed > 0:
-                        st.markdown(f"<div style='text-align:center; margin-top:10px; color:{msg_color}; font-weight:600; font-size:14px;'>Attend {int(needed) + 1} more to hit 75%</div>", unsafe_allow_html=True)
+                        st.markdown(f"<div style='text-align:center; margin-top:10px; color:{msg_color}; font-weight:600; font-size:14px;'>Attend {int(needed) + 1} more</div>", unsafe_allow_html=True)
                     else:
                          st.markdown(f"<div style='text-align:center; margin-top:10px; color:{msg_color}; font-weight:600; font-size:14px;'>Safe!</div>", unsafe_allow_html=True)
                     
@@ -840,12 +856,10 @@ else:
                 st.session_state.mis_no = ""
                 st.rerun()
 
-# FOOTER (Text Color: Black)
-st.markdown("""
-<div style="text-align: center; margin-top: 50px; font-size: 13px; color: #000000;">
+# FOOTER
+footer_color = "var(--footer-color)"
+st.markdown(f"""
+<div style="text-align: center; margin-top: 50px; font-size: 13px; color: {footer_color};">
     Student Portal © 2026 • Built by <span style="color:#6a11cb; font-weight:700">IRONDEM2921 [AIML]</span>
 </div>
 """, unsafe_allow_html=True)
-
-
-
