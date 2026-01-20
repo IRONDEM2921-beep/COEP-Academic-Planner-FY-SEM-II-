@@ -9,6 +9,7 @@ import zlib
 import json
 from datetime import datetime, timedelta, date
 from difflib import SequenceMatcher
+import time
 
 # --------------------------------------------------
 # 1. PAGE CONFIGURATION & STATE INITIALIZATION
@@ -109,16 +110,6 @@ div[data-baseweb="input"] {{
 }}
 div[data-baseweb="input"] input {{ color: white !important; caret-color: white; }}
 div[data-testid="stDateInput"] input {{ color: #ffffff !important; font-weight: 600; }}
-
-/* --- EXPANDER HEADER --- */
-[data-testid="stExpander"] summary p {{
-    background: -webkit-linear-gradient(45deg, #4facfe, #00f2fe);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    font-size: 18px !important;
-    font-weight: 800 !important;
-}}
-[data-testid="stExpander"] summary svg {{ fill: var(--text-color) !important; color: var(--text-color) !important; }}
 
 /* --- BUTTONS --- */
 div.stButton > button[kind="primary"] {{
@@ -289,7 +280,7 @@ def map_to_slot(time_str, slots):
     except: pass
     return None
 
-# --- GOOGLE SHEETS PERSISTENCE (TIMETABLE & ATTENDANCE) ---
+# --- GOOGLE SHEETS PERSISTENCE ---
 def get_google_client():
     scope = ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive']
     creds = Credentials.from_service_account_info(st.secrets["gcp_service_account"], scopes=scope)
@@ -298,7 +289,6 @@ def get_google_client():
 def get_google_sheet(index=0):
     client = get_google_client()
     sheet_url = st.secrets["private_sheet_url"] 
-    # Open spreadsheet and select worksheet by index (0 = Attendance/Timetable, 1 = Leaderboard)
     try:
         sh = client.open_by_url(sheet_url)
         # Check if index exists, if not create
@@ -314,7 +304,6 @@ def load_attendance():
         data = sheet.col_values(1)
         return {cls_id: True for cls_id in data if cls_id}
     except Exception as e:
-        st.error(f"Database Connection Error: {e}")
         return {}
 
 def update_attendance_in_sheet(cls_id, action):
@@ -327,61 +316,53 @@ def update_attendance_in_sheet(cls_id, action):
             if cell:
                 sheet.delete_rows(cell.row)
     except Exception as e:
-        st.warning(f"Could not sync with cloud: {e}")
+        pass
 
 # --- LEADERBOARD FUNCTIONS ---
-def get_branch_high_score(branch):
+def get_leaderboard_data():
+    """Fetches entire leaderboard for edge case analysis"""
     try:
-        sheet = get_google_sheet(1) # Sheet 2 for Leaderboard
-        data = sheet.get_all_records() # Expects headers: Branch, Name, Score, Date
-        
-        # If sheet is empty/new, return 0
-        if not data: return 0, "No one yet!"
-        
+        sheet = get_google_sheet(1)
+        data = sheet.get_all_records()
+        if not data: return pd.DataFrame()
         df = pd.DataFrame(data)
-        if df.empty or 'Branch' not in df.columns or 'Score' not in df.columns:
-            return 0, "No one yet!"
-            
-        # Filter by branch
-        branch_df = df[df['Branch'] == branch]
-        if branch_df.empty:
-            return 0, "No one yet!"
-            
-        # Get Max
-        # Ensure Score is numeric
-        branch_df['Score'] = pd.to_numeric(branch_df['Score'])
-        max_row = branch_df.loc[branch_df['Score'].idxmax()]
-        return int(max_row['Score']), str(max_row['Name'])
-    except Exception as e:
-        return 0, "Error"
+        # Type enforcement
+        if 'Score' in df.columns:
+            df['Score'] = pd.to_numeric(df['Score'], errors='coerce').fillna(0).astype(int)
+        return df
+    except:
+        return pd.DataFrame()
 
-def update_leaderboard(name, branch, score):
+def get_overall_highest(df):
+    if df.empty or 'Score' not in df.columns: return 0, "No Data", "General"
+    max_idx = df['Score'].idxmax()
+    row = df.loc[max_idx]
+    return row['Score'], row['Name'], row['Branch']
+
+def get_branch_highest(df, branch):
+    if df.empty or 'Branch' not in df.columns: return 0, "No Data"
+    filtered = df[df['Branch'] == branch]
+    if filtered.empty: return 0, "No Data"
+    max_idx = filtered['Score'].idxmax()
+    row = filtered.loc[max_idx]
+    return row['Score'], row['Name']
+
+def update_leaderboard_score(name, branch, score):
     try:
-        sheet = get_google_sheet(1) # Sheet 2
-        
-        # Check if headers exist, if not add them
+        sheet = get_google_sheet(1)
+        # Check if headers exist
         if not sheet.row_values(1):
             sheet.append_row(["Branch", "Name", "Score", "Date"])
             
-        # Get existing data to check if we need to update a row or append
-        records = sheet.get_all_records()
-        df = pd.DataFrame(records)
-        
-        # Simple Logic: We just append a new high score record. 
-        # The 'get_branch_high_score' logic calculates the max dynamically.
-        # This keeps a history of high scores.
-        
-        current_max, holder = get_branch_high_score(branch)
-        
-        if score > current_max:
-            sheet.append_row([branch, name, score, str(date.today())])
-            return True, f"🎉 New Branch Record! You beat {holder}!"
-        else:
-            return False, f"Good effort! But {holder} still holds the record ({current_max})."
-            
+        # Optimization: We append new high score. 
+        # The logic fetches all and finds MAX, so we don't need to search/update rows.
+        # This acts as a log of high scores.
+        sheet.append_row([branch, name, score, str(date.today())])
+        return True, "Success"
     except Exception as e:
-        return False, f"Cloud Error: {e}"
+        return False, str(e)
 
+# --- MASTER ICS GENERATION ---
 def generate_master_ics(weekly_schedule, semester_end_date):
     day_map = { "Monday": "MO", "Tuesday": "TU", "Wednesday": "WE", "Thursday": "TH", "Friday": "FR", "Saturday": "SA", "Sunday": "SU" }
     ics_lines = [ "BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//StudentPortal//MasterTimetable//EN", "CALSCALE:GREGORIAN", "METHOD:PUBLISH" ]
@@ -557,10 +538,10 @@ def calculate_semester_totals(timetable_entries):
     return totals
 
 # --------------------------------------------------
-# 6. GAME INTEGRATION (DOODLE JUMP)
+# 6. GAME INTEGRATION (AUTOMATIC SCORE)
 # --------------------------------------------------
 
-def render_game_html(branch_name, high_score_val, holder_name):
+def render_game_html(mis_user):
     # Detect theme colors for game CSS
     bg_color = current_theme['game_bg']
     grid_color = current_theme['game_grid']
@@ -593,7 +574,8 @@ def render_game_html(branch_name, high_score_val, holder_name):
         p {{ font-size: 24px; color: #444; margin: 5px 0; }}
         .btn {{ background: #fff; border: 2px solid #333; border-radius: 8px; padding: 10px 25px; font-family: 'Patrick Hand', cursive; font-size: 28px; color: #333; cursor: pointer; margin-top: 25px; transition: transform 0.1s, background 0.1s; box-shadow: 3px 3px 0px rgba(0,0,0,0.1); }}
         .btn:hover {{ transform: scale(1.05); background: #f0f0e0; }}
-        .branch-info {{ position: absolute; bottom: 10px; width: 100%; text-align: center; font-size: 16px; color: #666; }}
+        .auto-save-msg {{ font-size:16px; color:#6a11cb; margin-top:15px; font-weight:bold; }}
+        #save-link {{ display:none; color: #6a11cb; font-size: 20px; margin-top: 15px; font-weight: bold; text-decoration: underline; cursor: pointer; }}
     </style>
 </head>
 <body>
@@ -604,20 +586,15 @@ def render_game_html(branch_name, high_score_val, holder_name):
         <div id="start-screen" class="menu-screen">
             <h1>Doodle Jump</h1>
             <p>Use Arrows / Touch sides</p>
-            <div style="margin-top:20px; font-size:18px; color:#6a11cb; font-weight:bold;">
-                Best in {branch_name}: {high_score_val} <br>
-                <span style="font-size:14px; color:#888;">(Held by {holder_name})</span>
-            </div>
             <button class="btn" onclick="startGame()">Play</button>
         </div>
         <div id="game-over-screen" class="menu-screen">
             <h1>game over!</h1>
             <p>score: <span id="final-score">0</span></p>
             <p>high score: <span id="high-score">0</span></p>
-            <div style="font-size:16px; color:#d32f2f; margin-top:10px;">
-                Scroll down to submit score!
-            </div>
-            <button class="btn" onclick="startGame()">play again</button>
+            <div id="auto-msg" class="auto-save-msg">Saving score...</div>
+            <a id="save-link" href="#" target="_parent">CLICK TO SAVE SCORE</a>
+            <button class="btn" onclick="startGame()" style="margin-top:40px;">play again</button>
         </div>
     </div>
 </div>
@@ -626,16 +603,16 @@ def render_game_html(branch_name, high_score_val, holder_name):
     const ctx = canvas.getContext('2d');
     const GRAVITY = 0.375; const JUMP_FORCE = -13.81; const MOVE_SPEED = 8.12;
     const GAME_W = 400; const GAME_H = 600;
+    const USER_MIS = "{mis_user}";
+    
     let platforms = [], brokenParts = [], score = 0;
     let highScore = localStorage.getItem('doodleHighScore') || 0;
     let gameRunning = false, isGameOverAnimating = false;
     const doodler = {{ x: GAME_W / 2 - 20, y: GAME_H - 150, w: 60, h: 60, vx: 0, vy: 0, dir: 1 }};
     const keys = {{ left: false, right: false }};
     
-    // Controls (Keyboard + Touch)
     window.addEventListener('keydown', e => {{ if(e.key==="ArrowLeft") keys.left=true; if(e.key==="ArrowRight") keys.right=true; }});
     window.addEventListener('keyup', e => {{ if(e.key==="ArrowLeft") keys.left=false; if(e.key==="ArrowRight") keys.right=false; }});
-    // Touch support for mobile players
     canvas.addEventListener('touchstart', e => {{
         e.preventDefault();
         const touchX = e.touches[0].clientX;
@@ -698,16 +675,41 @@ def render_game_html(branch_name, high_score_val, holder_name):
         brokenParts.push({{ x: p.x, y: p.y, w: p.w/2, h: p.h, vy: -2, rot: 0, type: 'left' }});
         brokenParts.push({{ x: p.x + p.w/2, y: p.y, w: p.w/2, h: p.h, vy: -1, rot: 0, type: 'right' }});
     }}
+    
     function triggerGameOverSequence() {{
         if (isGameOverAnimating) return; isGameOverAnimating = true;
         if(score > highScore) {{ highScore = score; localStorage.setItem('doodleHighScore', highScore); }}
+        
         document.getElementById('final-score').innerText = score;
         document.getElementById('high-score').innerText = highScore;
+        
         platforms = []; brokenParts = []; doodler.y = -70; doodler.vy = 0;
         const goScreen = document.getElementById('game-over-screen');
         goScreen.classList.remove('hidden'); void goScreen.offsetWidth; goScreen.classList.add('slide-up');
         document.getElementById('score-display').classList.add('fade-out');
+
+        // AUTO SAVE LOGIC
+        // We construct a URL param update.
+        // Important: We use window.parent to break out of iframe if allowed.
+        // Fallback: If blocked, we show the 'SAVE SCORE' link.
+        
+        const saveUrl = window.parent.location.pathname + '?score=' + score + '&user=' + USER_MIS;
+        const fallbackLink = document.getElementById('save-link');
+        const autoMsg = document.getElementById('auto-msg');
+        
+        fallbackLink.href = saveUrl;
+        
+        setTimeout(() => {{
+            try {{
+                window.parent.location.href = saveUrl;
+            }} catch(e) {{
+                // If automatic redirect fails (Sandbox restriction), show manual link
+                autoMsg.style.display = 'none';
+                fallbackLink.style.display = 'block';
+            }}
+        }}, 800);
     }}
+
     function drawScribbleFill(x, y, w, h, color) {{
         ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.beginPath();
         for (let i = y + 4; i < y + h - 2; i += 3) {{ ctx.moveTo(x + 5, i); ctx.bezierCurveTo(x + w/3, i - 2, x + 2*w/3, i + 2, x + w - 5, i); }}
@@ -759,6 +761,8 @@ def render_game_html(branch_name, high_score_val, holder_name):
         document.getElementById('start-screen').classList.add('hidden');
         const goScreen = document.getElementById('game-over-screen'); goScreen.classList.remove('slide-up');
         document.getElementById('score-display').classList.remove('fade-out');
+        document.getElementById('save-link').style.display = 'none'; // Reset link
+        document.getElementById('auto-msg').style.display = 'block'; // Reset msg
         isGameOverAnimating = false; init();
         if (!gameRunning) {{ gameRunning = true; requestAnimationFrame(loop); }}
     }}
@@ -813,6 +817,36 @@ else:
         subs, table, name, branch = get_schedule(mis, sub_dfs, sched_df)
 
         if subs:
+            # -------------------------------------------------------
+            # AUTO-SAVE SCORE HANDLER (Query Param Check)
+            # -------------------------------------------------------
+            try:
+                # Retrieve Params (Streamlit > 1.30 syntax)
+                qp = st.query_params
+                new_score = qp.get("score")
+                user_check = qp.get("user")
+                
+                if new_score and user_check:
+                    if user_check == mis:
+                        score_val = int(new_score)
+                        # Find previous high score to see if it's a record
+                        full_df = get_leaderboard_data()
+                        prev_high, _ = get_branch_highest(full_df, branch)
+                        
+                        success, msg = update_leaderboard_score(name, branch, score_val)
+                        
+                        if score_val > prev_high:
+                            st.toast(f"🎉 New Personal Record: {score_val}!", icon="🏆")
+                        else:
+                            st.toast(f"Score saved: {score_val}", icon="✅")
+                    else:
+                        st.error("Security Warning: Score submission mismatch.")
+                    
+                    # Clear params immediately
+                    st.query_params.clear()
+            except Exception as e:
+                pass
+
             # --- PROFILE ---
             st.markdown(f"""<div class="student-card"><div class="student-name">{name}</div><div class="student-meta">{branch} • MIS: {mis}</div></div>""", unsafe_allow_html=True)
 
@@ -910,54 +944,68 @@ else:
                     st.write("") 
                 col_idx += 1
 
-            # --- 4. GAME SECTION (NEW) ---
+            # --- 4. GAME SECTION (UPDATED) ---
             st.markdown("""<hr style="border:1px solid rgba(128,128,128,0.2); margin: 40px 0;">""", unsafe_allow_html=True)
-            st.markdown("""<h3 style="font-size: 28px; font-weight: 700; margin-bottom: 20px; background: linear-gradient(to right, #6a11cb, #fbc2eb); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">🎮 Stress Buster</h3>""", unsafe_allow_html=True)
+            st.markdown("""<h3 style="font-size: 28px; font-weight: 700; margin-bottom: 20px; background: linear-gradient(to right, #6a11cb, #fbc2eb); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">🎮 Stress Buster Leaderboard</h3>""", unsafe_allow_html=True)
 
-            with st.expander("Play Doodle Jump", expanded=False):
-                # 1. Fetch Current Branch Leader
-                curr_high, curr_holder = get_branch_high_score(branch)
+            with st.expander("Play & View High Scores", expanded=False):
+                # Data Fetching for Leaderboard
+                full_leaderboard_df = get_leaderboard_data()
                 
-                c_game, c_leaderboard = st.columns([2, 1])
-                
-                with c_game:
-                    # Render Game with interpolated variables
-                    game_html = render_game_html(branch, curr_high, curr_holder)
-                    components.html(game_html, height=650, scrolling=False)
+                # --- Leaderboard Controls ---
+                col_ctrl, col_stats = st.columns([1, 2])
+                with col_ctrl:
+                    view_mode = st.radio("View High Score:", ["Overall College", "By Branch"], horizontal=True)
                     
-                    # 2. Score Submission Form (Below Canvas)
-                    st.markdown("---")
-                    st.caption("Did you beat the high score? Submit it below to update the global leaderboard!")
-                    
-                    with st.form("score_submission"):
-                        col_in, col_btn = st.columns([3, 1])
-                        with col_in:
-                            submitted_score = st.number_input("My Score", min_value=0, step=1, label_visibility="collapsed", placeholder="Enter score")
-                        with col_btn:
-                            submit_btn = st.form_submit_button("Submit Score", type="primary")
-                            
-                        if submit_btn:
-                            if submitted_score > 0:
-                                success, msg = update_leaderboard(name, branch, submitted_score)
-                                if success:
-                                    st.success(msg)
-                                    st.rerun()
-                                else:
-                                    st.warning(msg)
-                            else:
-                                st.error("Score must be > 0")
+                    selected_branch_filter = "All"
+                    if view_mode == "By Branch":
+                        # Populate branches dynamically from data + defaults
+                        existing_branches = full_leaderboard_df['Branch'].unique().tolist() if not full_leaderboard_df.empty else []
+                        defaults = ["AIML", "CSE", "IT", "ENTC", "MECH", "CIVIL", "INSTR"]
+                        all_branches = sorted(list(set(existing_branches + defaults)))
+                        selected_branch_filter = st.selectbox("Select Branch", all_branches, index=all_branches.index(branch) if branch in all_branches else 0)
 
-                with c_leaderboard:
-                    st.markdown(f"### 🏆 {branch} Top Score")
+                # --- Calculate Stats ---
+                overall_score, overall_name, overall_branch = get_overall_highest(full_leaderboard_df)
+                
+                display_score = 0
+                display_name = "-"
+                display_label = ""
+                
+                if view_mode == "Overall College":
+                    display_score = overall_score
+                    display_name = f"{overall_name} ({overall_branch})"
+                    display_label = "🏆 College Record"
+                else:
+                    s_score, s_name = get_branch_highest(full_leaderboard_df, selected_branch_filter)
+                    display_score = s_score
+                    display_name = s_name
+                    display_label = f"🥇 {selected_branch_filter} Topper"
+
+                with col_stats:
                     st.markdown(f"""
-                    <div style="background: linear-gradient(135deg, #FFD700 0%, #FDB931 100%); padding: 20px; border-radius: 15px; text-align: center; color: #5c3a1f; box-shadow: 0 4px 15px rgba(253, 185, 49, 0.4);">
-                        <div style="font-size: 48px; font-weight: 800;">{curr_high}</div>
-                        <div style="font-size: 18px; font-weight: 600; margin-top:5px;">{curr_holder}</div>
-                        <div style="font-size: 12px; margin-top:10px; opacity:0.8;">Branch: {branch}</div>
+                    <div style="background: linear-gradient(135deg, #FFD700 0%, #FDB931 100%); padding: 15px; border-radius: 12px; text-align: center; color: #5c3a1f; box-shadow: 0 4px 15px rgba(253, 185, 49, 0.4); display:flex; align-items:center; justify-content:space-around;">
+                        <div style="text-align:left;">
+                            <div style="font-size: 14px; font-weight: 700; text-transform:uppercase;">{display_label}</div>
+                            <div style="font-size: 24px; font-weight: 800;">{display_score}</div>
+                            <div style="font-size: 14px; opacity:0.9;">Held by: {display_name}</div>
+                        </div>
+                        <div style="font-size:40px;">👑</div>
                     </div>
                     """, unsafe_allow_html=True)
-                    
-                    st.info("💡 **How it works:** \n1. Play the game.\n2. If you get a high score, enter it in the box on the left.\n3. Click Submit to claim your throne!")
+                
+                st.markdown("---")
+                
+                # --- Game Render ---
+                c_game_main, c_game_info = st.columns([3, 1])
+                with c_game_main:
+                    game_html = render_game_html(mis)
+                    # scrolling=False is crucial to prevent iframe scrollbars
+                    components.html(game_html, height=650, scrolling=False)
+                
+                with c_game_info:
+                    st.info(f"**Playing as:**\n\n{name}\n\n({branch})")
+                    st.warning("⚠️ **Note:**\nWhen the game ends, the page will reload automatically to save your score.")
 
         else:
             st.error("MIS not found.")
