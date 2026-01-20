@@ -224,19 +224,25 @@ table.custom-grid {{ width: 100%; min-width: 1000px; border-collapse: separate; 
     position: relative; cursor: default;
 }}
 
-/* FIX: Force Dark Text inside filled cards regardless of Theme Mode */
-.class-card.filled, 
+/* FIX: Apply Border/Shadow ONLY to the card container */
+.class-card.filled {{
+    border: 1px solid rgba(255,255,255,0.4) !important;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.05) !important;
+    color: #2c3e50 !important; /* Default text color for container */
+}}
+
+/* FIX: Force Dark Text on inner elements, but REMOVE their borders */
 .class-card.filled div, 
 .class-card.filled span, 
 .class-card.filled p {{
-    color: #2c3e50 !important; /* Force Dark Blue/Black text on pastel backgrounds */
-    border: 1px solid rgba(255,255,255,0.4);
-    box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+    color: #2c3e50 !important; /* Force Dark Blue/Black text */
+    border: none !important;    /* No inner rectangles */
+    box-shadow: none !important; /* No inner shadows */
 }}
 
 .class-card.filled:hover {{
     transform: translateY(-5px) scale(1.03);
-    box-shadow: 0 15px 30px rgba(0,0,0,0.15);
+    box-shadow: 0 15px 30px rgba(0,0,0,0.15) !important;
     z-index: 100;
 }}
 .type-empty {{
