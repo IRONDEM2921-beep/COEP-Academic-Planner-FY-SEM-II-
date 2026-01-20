@@ -223,11 +223,17 @@ table.custom-grid {{ width: 100%; min-width: 1000px; border-collapse: separate; 
     border-radius: 18px; transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
     position: relative; cursor: default;
 }}
-.class-card.filled {{
-    color: #2c3e50; /* Always dark text inside colored cards */
+
+/* FIX: Force Dark Text inside filled cards regardless of Theme Mode */
+.class-card.filled, 
+.class-card.filled div, 
+.class-card.filled span, 
+.class-card.filled p {{
+    color: #2c3e50 !important; /* Force Dark Blue/Black text on pastel backgrounds */
     border: 1px solid rgba(255,255,255,0.4);
     box-shadow: 0 4px 6px rgba(0,0,0,0.05);
 }}
+
 .class-card.filled:hover {{
     transform: translateY(-5px) scale(1.03);
     box-shadow: 0 15px 30px rgba(0,0,0,0.15);
@@ -242,7 +248,8 @@ table.custom-grid {{ width: 100%; min-width: 1000px; border-collapse: separate; 
 .batch-badge {{
     background: rgba(255,255,255,0.6); padding: 3px 8px; border-radius: 10px;
     font-size: 10px; font-weight: 700; text-transform: uppercase; display: inline-block;
-    margin-bottom: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); color: #2c3e50;
+    margin-bottom: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); 
+    color: #2c3e50 !important; /* Force dark text on badge */
 }}
 
 /* ATTENDANCE CARDS */
