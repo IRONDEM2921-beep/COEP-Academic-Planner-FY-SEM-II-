@@ -216,51 +216,50 @@ table.custom-grid {{ width: 100%; min-width: 1000px; border-collapse: separate; 
 }}
 [data-testid="stExpander"] summary svg {{ fill: var(--text-color) !important; color: var(--text-color) !important; }}
 
-/* --- DROPDOWN (SELECTBOX) CRITICAL FIXES --- */
+/* --- DROPDOWN (SELECTBOX) FIXED STYLES --- */
 
-/* 1. Force the dropdown CONTAINER to accept styling */
-div[data-baseweb="select"] {{
-    background-color: transparent !important;
+/* 1. The Box itself */
+div[data-baseweb="select"] > div:first-child {{
+    border-color: #ff4b4b !important;
 }}
 
-/* 2. NUCLEAR OPTION: Make ALL text inside the Select Box RED */
-div[data-baseweb="select"] * {{
-    color: #ff4b4b !important;
+/* 2. Text Inside the Box (Selected Value) */
+div[data-baseweb="select"] span, div[data-baseweb="select"] div {{
+    color: #ff4b4b !important; /* Force Red */
     font-weight: 700 !important;
-    -webkit-text-fill-color: #ff4b4b !important;
 }}
 
-/* 3. The Dropdown Menu List (Popover) - FIXED POSITIONING */
+/* 3. The Dropdown Menu (POPOVER) */
+div[data-baseweb="popover"] {{
+    z-index: 999999 !important; /* Force on top */
+}}
+
 ul[data-baseweb="menu"] {{
-    background-color: #0e1117 !important; 
-    border: 1px solid rgba(255,255,255,0.2) !important;
-    /* REMOVED 'position: fixed' to fix scrolling detachment */
-    /* Ensure z-index is high enough to float above everything */
-    z-index: 9999 !important;
+    background-color: #111 !important; /* Dark bg */
+    border: 1px solid #333 !important;
 }}
 
-/* 4. List Items (Options) */
+/* 4. Options in the Menu */
 li[role="option"] {{
-    background-color: #0e1117 !important;
+    color: #ff4b4b !important; /* Force Red Text */
+    background-color: #111 !important;
+    border-bottom: 1px solid #222 !important;
 }}
 
-/* 5. Text inside List Items - Red Gradient */
-li[role="option"] div {{
-    background: -webkit-linear-gradient(45deg, #ff9a44, #fc6076) !important;
-    -webkit-background-clip: text !important;
-    -webkit-text-fill-color: transparent !important;
-    font-weight: 600 !important;
-    font-size: 15px !important;
+/* 5. Text inside options */
+li[role="option"] * {{
+    color: #ff4b4b !important; /* Deep nested text red */
 }}
 
-/* 6. Hover State */
+/* 6. Hover effect */
 li[role="option"]:hover {{
-    background-color: rgba(255, 75, 75, 0.1) !important;
+    background-color: #222 !important;
     cursor: pointer;
 }}
 
+/* 7. Icon Arrow */
 div[data-baseweb="select"] svg {{
-    fill: #ff4b4b !important; 
+    fill: #ff4b4b !important;
 }}
 </style>
 """, unsafe_allow_html=True)
@@ -610,15 +609,15 @@ def render_game_html(mis_user):
     <meta charset="UTF-8">
     <link href="https://fonts.googleapis.com/css2?family=Patrick+Hand&display=swap" rel="stylesheet">
     <style>
-        body {{ margin: 0; padding: 0; display: flex; justify-content: center; align-items: center; height: 620px; background-color: transparent; font-family: 'Patrick Hand', cursive; }}
+        body {{ margin: 0; padding: 0; display: flex; justify-content: center; align-items: center; height: 600px; background-color: transparent; font-family: 'Patrick Hand', cursive; }}
         #game-container {{
-            position: relative; width: 400px; height: 600px;
+            position: relative; width: 100%; height: 100%;
             background-color: {bg_color};
             background-image: linear-gradient({grid_color} 1px, transparent 1px), linear-gradient(90deg, {grid_color} 1px, transparent 1px);
             background-size: 15px 15px;
-            box-shadow: 0 0 30px rgba(0,0,0,0.2); overflow: hidden; border-radius: 12px;
+            box-shadow: none; border-radius: 12px;
         }}
-        canvas {{ display: block; position: absolute; top: 0; left: 0; z-index: 10; pointer-events: none; }}
+        canvas {{ display: block; position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; pointer-events: none; }}
         #ui-layer {{ position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 5; }}
         #score-display {{ position: absolute; top: 5px; left: 15px; font-size: 32px; color: #888; font-weight: bold; transition: opacity 0.3s; }}
         .menu-screen {{ position: absolute; width: 100%; height: 100%; background: rgba(255,255,255, 0.9); display: flex; flex-direction: column; justify-content: center; align-items: center; pointer-events: auto; text-align: center; }}
@@ -632,7 +631,20 @@ def render_game_html(mis_user):
         .btn {{ background: #fff; border: 2px solid #333; border-radius: 8px; padding: 10px 25px; font-family: 'Patrick Hand', cursive; font-size: 28px; color: #333; cursor: pointer; margin-top: 25px; transition: transform 0.1s, background 0.1s; box-shadow: 3px 3px 0px rgba(0,0,0,0.1); }}
         .btn:hover {{ transform: scale(1.05); background: #f0f0e0; }}
         .auto-save-msg {{ font-size:16px; color:#6a11cb; margin-top:15px; font-weight:bold; }}
-        #save-link {{ display:none; color: #6a11cb; font-size: 20px; margin-top: 15px; font-weight: bold; text-decoration: underline; cursor: pointer; }}
+        /* Make the SAVE link behave like a button/link but use target=_top */
+        #save-link {{
+            display: none;
+            margin-top: 15px;
+            color: #ffffff;
+            background: #6a11cb;
+            padding: 10px 20px;
+            border-radius: 50px;
+            text-decoration: none;
+            font-weight: bold;
+            font-size: 18px;
+            box-shadow: 0 4px 10px rgba(106, 17, 203, 0.3);
+        }}
+        #save-link:hover {{ transform: translateY(-2px); }}
     </style>
 </head>
 <body>
@@ -650,7 +662,9 @@ def render_game_html(mis_user):
             <p>score: <span id="final-score">0</span></p>
             <p>high score: <span id="high-score">0</span></p>
             <div id="auto-msg" class="auto-save-msg">Saving score...</div>
+            
             <a id="save-link" href="#" target="_top">CLICK TO SAVE SCORE</a>
+            
             <button class="btn" onclick="startGame()" style="margin-top:40px;">play again</button>
         </div>
     </div>
@@ -658,8 +672,13 @@ def render_game_html(mis_user):
 <script>
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
+    
+    // Scale canvas to container
+    canvas.width = document.getElementById('game-container').offsetWidth;
+    canvas.height = document.getElementById('game-container').offsetHeight;
+    
     const GRAVITY = 0.375; const JUMP_FORCE = -13.81; const MOVE_SPEED = 8.12;
-    const GAME_W = 400; const GAME_H = 600;
+    const GAME_W = canvas.width; const GAME_H = canvas.height;
     const USER_MIS = "{mis_user}";
     
     let platforms = [], brokenParts = [], score = 0;
@@ -745,39 +764,28 @@ def render_game_html(mis_user):
         goScreen.classList.remove('hidden'); void goScreen.offsetWidth; goScreen.classList.add('slide-up');
         document.getElementById('score-display').classList.add('fade-out');
 
-        // AUTO SAVE LOGIC (IMPROVED for Reliability)
-        // Try to get base URL from document.referrer (more reliable in iframes)
-        // or fallback to window.parent location if same origin.
+        // AUTO SAVE LOGIC
+        // Using window.top.location.href ensures we get the FULL current URL of the main page
+        let baseUrl = window.top.location.href; 
         
-        let baseUrl = "";
         try {{
-            baseUrl = document.referrer;
-            if (!baseUrl || baseUrl === "") {{
-               baseUrl = window.parent.location.href;
-            }}
+            const url = new URL(baseUrl);
+            url.searchParams.set('score', score);
+            url.searchParams.set('user', USER_MIS);
+            
+            const saveUrl = url.toString();
+            const fallbackLink = document.getElementById('save-link');
+            const autoMsg = document.getElementById('auto-msg');
+            
+            // Set the link so the user can manually click it
+            fallbackLink.href = saveUrl;
+            
+            // Show the link immediately
+            autoMsg.style.display = 'none';
+            fallbackLink.style.display = 'inline-block';
+            
         }} catch(e) {{
-            console.log("CORS blocked parent access, using fallback");
-        }}
-        
-        if (baseUrl) {{
-            try {{
-                const url = new URL(baseUrl);
-                url.searchParams.set('score', score);
-                url.searchParams.set('user', USER_MIS);
-                
-                const saveUrl = url.toString();
-                const fallbackLink = document.getElementById('save-link');
-                const autoMsg = document.getElementById('auto-msg');
-                
-                fallbackLink.href = saveUrl;
-                
-                // Try automatic redirect on the TOP window (breaking out of iframe)
-                setTimeout(() => {{
-                    window.top.location.href = saveUrl;
-                }}, 800);
-            }} catch(e) {{
-                // URL construction failed
-            }}
+            console.log("Error constructing save URL", e);
         }}
     }}
 
@@ -1082,15 +1090,11 @@ else:
                 st.markdown("---")
                 
                 # --- Game Render ---
-                c_game_main, c_game_info = st.columns([3, 1])
-                with c_game_main:
-                    game_html = render_game_html(mis)
-                    # scrolling=False is crucial to prevent iframe scrollbars
-                    components.html(game_html, height=650, scrolling=False)
+                # Full Width render for better native feel
+                game_html = render_game_html(mis)
+                components.html(game_html, height=650, scrolling=False)
                 
-                with c_game_info:
-                    st.info(f"**Playing as:**\n\n{name}\n\n({branch})")
-                    st.warning("⚠️ **Note:**\nWhen the game ends, the page will reload automatically to save your score.")
+                st.info(f"**Playing as:** {name} ({branch})")
 
         else:
             st.error("MIS not found.")
