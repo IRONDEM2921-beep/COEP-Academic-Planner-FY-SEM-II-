@@ -218,39 +218,39 @@ table.custom-grid {{ width: 100%; min-width: 1000px; border-collapse: separate; 
 
 /* --- DROPDOWN (SELECTBOX) CRITICAL FIXES --- */
 
-/* 1. Selected Value (Visible inside the box) */
-div[data-baseweb="select"] > div:first-child {{
-    /* FORCE BRIGHT RED TEXT */
-    color: #ff4b4b !important; 
-    font-weight: 800 !important;
-    -webkit-text-fill-color: #ff4b4b !important;
-    background: transparent !important;
+/* 1. Force the dropdown CONTAINER to accept styling */
+div[data-baseweb="select"] {{
+    background-color: transparent !important;
 }}
 
-/* 2. Text Elements Inside the Selection Box */
-div[data-baseweb="select"] div {{
+/* 2. NUCLEAR OPTION: Make ALL text inside the Select Box RED */
+div[data-baseweb="select"] * {{
     color: #ff4b4b !important;
+    font-weight: 700 !important;
+    -webkit-text-fill-color: #ff4b4b !important;
 }}
 
-/* 3. The Dropdown Menu List (Popover) */
+/* 3. The Dropdown Menu List (Popover) - FIXED POSITIONING */
 ul[data-baseweb="menu"] {{
-    background-color: #0e1117 !important; /* Force dark background */
+    background-color: #0e1117 !important; 
     border: 1px solid rgba(255,255,255,0.2) !important;
-    /* FIX FOR SCROLLING DETACHMENT */
-    /* This forces the menu to stick to the viewport, mitigating the float-away issue */
-    position: fixed !important; 
+    /* REMOVED 'position: fixed' to fix scrolling detachment */
+    /* Ensure z-index is high enough to float above everything */
+    z-index: 9999 !important;
 }}
 
 /* 4. List Items (Options) */
 li[role="option"] {{
     background-color: #0e1117 !important;
-    color: #ff4b4b !important; /* Red Text */
 }}
 
-/* 5. Text inside List Items */
+/* 5. Text inside List Items - Red Gradient */
 li[role="option"] div {{
-    color: #ff4b4b !important; /* Red Text */
+    background: -webkit-linear-gradient(45deg, #ff9a44, #fc6076) !important;
+    -webkit-background-clip: text !important;
+    -webkit-text-fill-color: transparent !important;
     font-weight: 600 !important;
+    font-size: 15px !important;
 }}
 
 /* 6. Hover State */
@@ -259,9 +259,8 @@ li[role="option"]:hover {{
     cursor: pointer;
 }}
 
-/* 7. The Arrow Icon */
 div[data-baseweb="select"] svg {{
-    fill: #ff4b4b !important;
+    fill: #ff4b4b !important; 
 }}
 </style>
 """, unsafe_allow_html=True)
@@ -651,7 +650,7 @@ def render_game_html(mis_user):
             <p>score: <span id="final-score">0</span></p>
             <p>high score: <span id="high-score">0</span></p>
             <div id="auto-msg" class="auto-save-msg">Saving score...</div>
-            <a id="save-link" href="#" target="_parent">CLICK TO SAVE SCORE</a>
+            <a id="save-link" href="#" target="_top">CLICK TO SAVE SCORE</a>
             <button class="btn" onclick="startGame()" style="margin-top:40px;">play again</button>
         </div>
     </div>
@@ -760,9 +759,6 @@ def render_game_html(mis_user):
             console.log("CORS blocked parent access, using fallback");
         }}
         
-        // If we still don't have a URL (very strict sandbox), we can't auto-save properly 
-        // without a hardcoded base URL. 
-        
         if (baseUrl) {{
             try {{
                 const url = new URL(baseUrl);
@@ -775,8 +771,9 @@ def render_game_html(mis_user):
                 
                 fallbackLink.href = saveUrl;
                 
+                // Try automatic redirect on the TOP window (breaking out of iframe)
                 setTimeout(() => {{
-                    window.parent.location.href = saveUrl;
+                    window.top.location.href = saveUrl;
                 }}, 800);
             }} catch(e) {{
                 // URL construction failed
