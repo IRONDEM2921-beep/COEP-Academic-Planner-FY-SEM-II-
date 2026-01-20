@@ -216,45 +216,52 @@ table.custom-grid {{ width: 100%; min-width: 1000px; border-collapse: separate; 
 }}
 [data-testid="stExpander"] summary svg {{ fill: var(--text-color) !important; color: var(--text-color) !important; }}
 
-/* --- DROPDOWN (SELECTBOX) STYLING FIXES --- */
+/* --- DROPDOWN (SELECTBOX) CRITICAL FIXES --- */
 
-/* 1. The selected value shown in the closed box (The "Red Border Box") */
+/* 1. Selected Value (Visible inside the box) */
 div[data-baseweb="select"] > div:first-child {{
     /* FORCE BRIGHT RED TEXT */
     color: #ff4b4b !important; 
     font-weight: 800 !important;
-    -webkit-text-fill-color: #ff4b4b !important; /* Override potential gradients */
+    -webkit-text-fill-color: #ff4b4b !important;
     background: transparent !important;
 }}
 
-/* 2. The dropdown list container (popover) */
+/* 2. Text Elements Inside the Selection Box */
+div[data-baseweb="select"] div {{
+    color: #ff4b4b !important;
+}}
+
+/* 3. The Dropdown Menu List (Popover) */
 ul[data-baseweb="menu"] {{
     background-color: #0e1117 !important; /* Force dark background */
-    border: 1px solid rgba(255,255,255,0.1) !important;
+    border: 1px solid rgba(255,255,255,0.2) !important;
+    /* FIX FOR SCROLLING DETACHMENT */
+    /* This forces the menu to stick to the viewport, mitigating the float-away issue */
+    position: fixed !important; 
 }}
 
-/* 3. The individual list items (options) */
+/* 4. List Items (Options) */
 li[role="option"] {{
-    background-color: #0e1117 !important; /* Force dark background */
+    background-color: #0e1117 !important;
+    color: #ff4b4b !important; /* Red Text */
 }}
 
-/* 4. The TEXT inside the list items */
+/* 5. Text inside List Items */
 li[role="option"] div {{
-    /* BRIGHT RED/ORANGE GRADIENT FOR VISIBILITY */
-    background: -webkit-linear-gradient(45deg, #ff9a44, #fc6076) !important;
-    -webkit-background-clip: text !important;
-    -webkit-text-fill-color: transparent !important;
+    color: #ff4b4b !important; /* Red Text */
     font-weight: 600 !important;
-    font-size: 15px !important;
 }}
 
-/* 5. Hover state for list items */
+/* 6. Hover State */
 li[role="option"]:hover {{
-    background-color: rgba(255, 255, 255, 0.05) !important;
+    background-color: rgba(255, 75, 75, 0.1) !important;
+    cursor: pointer;
 }}
 
+/* 7. The Arrow Icon */
 div[data-baseweb="select"] svg {{
-    fill: #ff4b4b !important; /* Make the arrow red too */
+    fill: #ff4b4b !important;
 }}
 </style>
 """, unsafe_allow_html=True)
@@ -740,27 +747,41 @@ def render_game_html(mis_user):
         document.getElementById('score-display').classList.add('fade-out');
 
         // AUTO SAVE LOGIC (IMPROVED for Reliability)
-        // 1. Get current URL
-        const url = new URL(window.parent.location.href);
-        // 2. Set search params
-        url.searchParams.set('score', score);
-        url.searchParams.set('user', USER_MIS);
+        // Try to get base URL from document.referrer (more reliable in iframes)
+        // or fallback to window.parent location if same origin.
         
-        const saveUrl = url.toString();
-        const fallbackLink = document.getElementById('save-link');
-        const autoMsg = document.getElementById('auto-msg');
-        
-        fallbackLink.href = saveUrl;
-        
-        setTimeout(() => {{
-            try {{
-                window.parent.location.href = saveUrl;
-            }} catch(e) {{
-                // If automatic redirect fails (Sandbox restriction), show manual link
-                autoMsg.style.display = 'none';
-                fallbackLink.style.display = 'block';
+        let baseUrl = "";
+        try {{
+            baseUrl = document.referrer;
+            if (!baseUrl || baseUrl === "") {{
+               baseUrl = window.parent.location.href;
             }}
-        }}, 800);
+        }} catch(e) {{
+            console.log("CORS blocked parent access, using fallback");
+        }}
+        
+        // If we still don't have a URL (very strict sandbox), we can't auto-save properly 
+        // without a hardcoded base URL. 
+        
+        if (baseUrl) {{
+            try {{
+                const url = new URL(baseUrl);
+                url.searchParams.set('score', score);
+                url.searchParams.set('user', USER_MIS);
+                
+                const saveUrl = url.toString();
+                const fallbackLink = document.getElementById('save-link');
+                const autoMsg = document.getElementById('auto-msg');
+                
+                fallbackLink.href = saveUrl;
+                
+                setTimeout(() => {{
+                    window.parent.location.href = saveUrl;
+                }}, 800);
+            }} catch(e) {{
+                // URL construction failed
+            }}
+        }}
     }}
 
     function drawScribbleFill(x, y, w, h, color) {{
@@ -846,6 +867,7 @@ try:
     
     if new_score and user_check:
         # Check against session state MIS (casted to string for safety)
+        # Note: Both are stripped of whitespace to prevent accidental mismatch
         if str(user_check).strip() == str(st.session_state.mis_no).strip():
             score_val = int(new_score)
             
@@ -867,7 +889,8 @@ try:
             else:
                 st.toast(f"Score saved: {score_val}", icon="✅")
         else:
-            st.error(f"Security Warning: Score mismatch. User: {user_check} vs Session: {st.session_state.mis_no}")
+            # Debugging: Show why it failed if mismatch occurs
+            st.error(f"Security Warning: Score mismatch. User in Link: '{user_check}' vs Logged In: '{st.session_state.mis_no}'")
         
         # Clear params immediately
         st.query_params.clear()
