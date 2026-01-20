@@ -64,12 +64,11 @@ dark_theme = {
 current_theme = light_theme if st.session_state.theme == 'light' else dark_theme
 
 # Generate CSS
-# NOTE: All CSS braces '{' are escaped as '{{' unless they contain a Python variable.
 st.markdown(f"""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap');
 
-/* --- CSS VARIABLES FOR THEME SWITCHING --- */
+/* --- CSS VARIABLES --- */
 :root {{
     --bg-color: {current_theme['bg_color']};
     --text-color: {current_theme['text_color']};
@@ -209,7 +208,6 @@ table.custom-grid {{ width: 100%; min-width: 1000px; border-collapse: separate; 
 
 /* --- EXPANDER HEADER --- */
 [data-testid="stExpander"] summary p {{
-    /* UPDATED: Brighter orange-to-red gradient for better visibility */
     background: -webkit-linear-gradient(45deg, #ff9a44, #fc6076);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
@@ -218,13 +216,42 @@ table.custom-grid {{ width: 100%; min-width: 1000px; border-collapse: separate; 
 }}
 [data-testid="stExpander"] summary svg {{ fill: var(--text-color) !important; color: var(--text-color) !important; }}
 
-/* --- SELECTBOX SELECTED VALUE --- */
+/* --- DROPDOWN (SELECTBOX) STYLING FIXES --- */
+
+/* 1. The selected value shown in the closed box */
 div[data-baseweb="select"] > div {{
     background: -webkit-linear-gradient(45deg, #ff9a44, #fc6076) !important;
     -webkit-background-clip: text !important;
     -webkit-text-fill-color: transparent !important;
     font-weight: 700 !important;
 }}
+
+/* 2. The dropdown list container (popover) */
+ul[data-baseweb="menu"] {{
+    background-color: #0e1117 !important; /* Force dark background */
+    border: 1px solid rgba(255,255,255,0.1) !important;
+}}
+
+/* 3. The individual list items (options) */
+li[role="option"] {{
+    background-color: #0e1117 !important; /* Force dark background */
+}}
+
+/* 4. The TEXT inside the list items */
+li[role="option"] div {{
+    /* BRIGHT RED/ORANGE GRADIENT FOR VISIBILITY */
+    background: -webkit-linear-gradient(45deg, #ff9a44, #fc6076) !important;
+    -webkit-background-clip: text !important;
+    -webkit-text-fill-color: transparent !important;
+    font-weight: 600 !important;
+    font-size: 15px !important;
+}}
+
+/* 5. Hover state for list items */
+li[role="option"]:hover {{
+    background-color: rgba(255, 255, 255, 0.05) !important;
+}}
+
 div[data-baseweb="select"] svg {{
     fill: var(--text-color) !important;
 }}
@@ -853,10 +880,14 @@ else:
                     if user_check == mis:
                         score_val = int(new_score)
                         # Find previous high score to see if it's a record
-                        full_df = get_leaderboard_data()
-                        prev_high, _ = get_branch_highest(full_df, branch)
+                        # Note: We fetch current data before writing to compare
+                        full_df_temp = get_leaderboard_data()
+                        prev_high, _ = get_branch_highest(full_df_temp, branch)
                         
                         success, msg = update_leaderboard_score(name, branch, score_val)
+                        
+                        # IMPORTANT: Wait for Google Sheet API to catch up
+                        time.sleep(1.5)
                         
                         if score_val > prev_high:
                             st.toast(f"🎉 New Personal Record: {score_val}!", icon="🏆")
@@ -867,6 +898,8 @@ else:
                     
                     # Clear params immediately
                     st.query_params.clear()
+                    # Force a rerun to fetch fresh data for the leaderboard display
+                    st.rerun()
             except Exception as e:
                 pass
 
