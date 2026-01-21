@@ -20,6 +20,10 @@ st.set_page_config(page_title="Student Timetable", page_icon="✨", layout="wide
 if 'theme' not in st.session_state:
     st.session_state.theme = 'light'
 
+# Initialize Leaderboard Branch Selection State
+if 'selected_lb_branch' not in st.session_state:
+    st.session_state.selected_lb_branch = "CSE"  # Default start
+
 def toggle_theme():
     st.session_state.theme = 'dark' if st.session_state.theme == 'light' else 'light'
 
@@ -215,66 +219,6 @@ table.custom-grid {{ width: 100%; min-width: 1000px; border-collapse: separate; 
     font-weight: 800 !important;
 }}
 [data-testid="stExpander"] summary svg {{ fill: var(--text-color) !important; color: var(--text-color) !important; }}
-
-/* --- DROPDOWN (SELECTBOX) FIXED & RESPONSIVE (RED FONT) --- */
-
-/* 1. The Container - Use Theme Variables */
-div[data-baseweb="select"] > div {{
-    background-color: var(--card-bg) !important;
-    border: 1px solid rgba(128, 128, 128, 0.2);
-    color: red !important; /* RED FONT */
-    border-radius: 12px !important;
-}}
-
-/* 2. The Text inside the box (Selected Value) */
-div[data-baseweb="select"] div {{
-    color: red !important; /* RED FONT */
-    font-weight: 600;
-}}
-
-/* 3. The SVG Arrow Icon - Ensure it is visible */
-div[data-baseweb="select"] svg {{
-    fill: red !important; /* RED ICON */
-}}
-
-/* 4. The Dropdown Menu List (Popover) */
-ul[data-baseweb="menu"] {{
-    background-color: var(--card-bg) !important;
-    border: 1px solid rgba(128, 128, 128, 0.2) !important;
-    box-shadow: 0 4px 20px var(--card-shadow) !important;
-    padding: 5px !important;
-    border-radius: 12px !important;
-    z-index: 9999 !important;
-    
-    /* FIX: Force absolute positioning to prevent detachment on scroll */
-    position: absolute !important;
-}}
-
-/* 5. List Items (Options) */
-li[role="option"] {{
-    background-color: transparent !important;
-    color: red !important; /* RED FONT */
-    border-bottom: 1px solid rgba(128,128,128,0.1);
-    margin-bottom: 2px;
-    border-radius: 8px;
-}}
-
-/* 6. Text inside List Items */
-li[role="option"] div {{
-    color: red !important; /* RED FONT */
-    font-weight: 500 !important;
-}}
-
-/* 7. Hover & Selection State */
-li[role="option"]:hover, li[role="option"][aria-selected="true"] {{
-    background-color: var(--table-row-hover) !important;
-    cursor: pointer;
-}}
-
-li[role="option"]:hover div, li[role="option"][aria-selected="true"] div {{
-    color: red !important; /* RED FONT */
-    font-weight: 700 !important;
-}}
 </style>
 """, unsafe_allow_html=True)
 
@@ -1113,12 +1057,20 @@ else:
                 with col_ctrl:
                     view_mode = st.radio("View High Score:", ["Overall College", "By Branch"], horizontal=True)
                     
-                    selected_branch_filter = "All"
                     if view_mode == "By Branch":
-                        existing_branches = full_leaderboard_df['Branch'].unique().tolist() if not full_leaderboard_df.empty else []
-                        defaults = ["CSE", "AIML", "MECH", "ELECTRICAL", "ENTC", "CIVIL", "MANUFACTURING", "INSTRU"]
-                        all_branches = sorted(list(set(existing_branches + defaults)))
-                        selected_branch_filter = st.selectbox("Select Branch", all_branches, index=all_branches.index(branch) if branch in all_branches else 0)
+                        # Branch List as Cards (Buttons)
+                        st.markdown("#### Select Branch:")
+                        branch_list = ["CSE", "AIML", "MECH", "ELECTRICAL", "ENTC", "CIVIL", "MANUFACTURING", "INSTRU"]
+                        
+                        # Create a 4-column grid for buttons
+                        b_cols = st.columns(4)
+                        for i, br_name in enumerate(branch_list):
+                            with b_cols[i % 4]:
+                                # If selected, make it PRIMARY (highlighted), else SECONDARY
+                                btn_type = "primary" if st.session_state.selected_lb_branch == br_name else "secondary"
+                                if st.button(br_name, key=f"br_btn_{i}", type=btn_type, use_container_width=True):
+                                    st.session_state.selected_lb_branch = br_name
+                                    st.rerun()
 
                 overall_score, overall_name, overall_branch = get_overall_highest(full_leaderboard_df)
                 
@@ -1131,10 +1083,11 @@ else:
                     display_name = f"{overall_name} ({overall_branch})"
                     display_label = "🏆 College Record"
                 else:
-                    s_score, s_name = get_branch_highest(full_leaderboard_df, selected_branch_filter)
+                    # Use the state variable for the selected branch
+                    s_score, s_name = get_branch_highest(full_leaderboard_df, st.session_state.selected_lb_branch)
                     display_score = s_score
                     display_name = s_name
-                    display_label = f"🥇 {selected_branch_filter} Topper"
+                    display_label = f"🥇 {st.session_state.selected_lb_branch} Topper"
 
                 with col_stats:
                     st.markdown(f"""
