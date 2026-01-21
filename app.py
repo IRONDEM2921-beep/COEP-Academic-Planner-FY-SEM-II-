@@ -600,39 +600,63 @@ def calculate_semester_totals(timetable_entries):
 
 def render_game_html(mis_user):
     # Detect theme colors for game CSS
-    bg_color = current_theme['game_bg']
-    grid_color = current_theme['game_grid']
+    bg_color = current_theme['game_grid'] # Using grid color for contrast or keep simplified
+    # Hardcoding a clean background for consistency
+    game_bg = "#fcfcf4"
+    grid_line = "#e0dacc"
     
     return f"""
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <link href="https://fonts.googleapis.com/css2?family=Patrick+Hand&display=swap" rel="stylesheet">
     <style>
-        body {{ margin: 0; padding: 0; display: flex; justify-content: center; align-items: center; height: 620px; background-color: transparent; font-family: 'Patrick Hand', cursive; }}
-        #game-container {{
-            position: relative; width: 400px; height: 600px;
-            background-color: {bg_color};
-            background-image: linear-gradient({grid_color} 1px, transparent 1px), linear-gradient(90deg, {grid_color} 1px, transparent 1px);
-            background-size: 15px 15px;
-            box-shadow: 0 0 30px rgba(0,0,0,0.2); overflow: hidden; border-radius: 12px;
+        body {{ 
+            margin: 0; padding: 0; 
+            display: flex; justify-content: center; align-items: center; 
+            height: 100vh; /* Full viewport height */
+            background-color: transparent; 
+            font-family: 'Patrick Hand', cursive; 
+            overflow: hidden; /* Prevent page scroll */
         }}
-        canvas {{ display: block; position: absolute; top: 0; left: 0; z-index: 10; pointer-events: none; }}
-        #ui-layer {{ position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 5; }}
-        #score-display {{ position: absolute; top: 5px; left: 15px; font-size: 32px; color: #888; font-weight: bold; transition: opacity 0.3s; }}
-        .menu-screen {{ position: absolute; width: 100%; height: 100%; background: rgba(255,255,255, 0.9); display: flex; flex-direction: column; justify-content: center; align-items: center; pointer-events: auto; text-align: center; }}
+        #game-container {{
+            position: relative; 
+            width: 100%; max-width: 400px; /* Responsive width */
+            aspect-ratio: 2/3; /* Maintain aspect ratio */
+            max-height: 95vh;
+            background-color: {game_bg};
+            background-image: linear-gradient({grid_line} 1px, transparent 1px), linear-gradient(90deg, {grid_line} 1px, transparent 1px);
+            background-size: 15px 15px;
+            box-shadow: 0 0 30px rgba(0,0,0,0.2); 
+            border-radius: 12px;
+            overflow: hidden;
+            touch-action: none; /* CRITICAL: Disables browser zooming/scrolling on the game */
+        }}
+        canvas {{ 
+            display: block; width: 100%; height: 100%; /* Fill container */
+            position: absolute; top: 0; left: 0; z-index: 10; 
+            pointer-events: auto; /* Ensure canvas gets events */
+        }}
+        #ui-layer {{ position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 20; }}
+        #score-display {{ position: absolute; top: 10px; left: 20px; font-size: 32px; color: #888; font-weight: bold; transition: opacity 0.3s; }}
+        .menu-screen {{ position: absolute; width: 100%; height: 100%; background: rgba(255,255,255, 0.95); display: flex; flex-direction: column; justify-content: center; align-items: center; pointer-events: auto; text-align: center; }}
         #start-screen {{ top: 0; left: 0; transition: opacity 0.3s; }}
-        #game-over-screen {{ left: 0; top: 100%; transition: top 1.7s cubic-bezier(0.19, 1, 0.22, 1); }}
+        #game-over-screen {{ left: 0; top: 100%; transition: top 0.5s ease-out; }}
         #game-over-screen.slide-up {{ top: 0% !important; }}
         .hidden {{ display: none !important; opacity: 0; }}
         .fade-out {{ opacity: 0; }}
-        h1 {{ font-size: 52px; color: #d32f2f; margin: 0 0 20px 0; transform: rotate(-3deg); text-shadow: 2px 2px 0px rgba(0,0,0,0.1); }}
-        p {{ font-size: 24px; color: #444; margin: 5px 0; }}
-        .btn {{ background: #fff; border: 2px solid #333; border-radius: 8px; padding: 10px 25px; font-family: 'Patrick Hand', cursive; font-size: 28px; color: #333; cursor: pointer; margin-top: 25px; transition: transform 0.1s, background 0.1s; box-shadow: 3px 3px 0px rgba(0,0,0,0.1); }}
-        .btn:hover {{ transform: scale(1.05); background: #f0f0e0; }}
+        h1 {{ font-size: 42px; color: #d32f2f; margin: 0 0 20px 0; transform: rotate(-3deg); text-shadow: 2px 2px 0px rgba(0,0,0,0.1); }}
+        p {{ font-size: 20px; color: #444; margin: 5px 0; }}
+        .btn {{ background: #fff; border: 2px solid #333; border-radius: 8px; padding: 10px 30px; font-family: 'Patrick Hand', cursive; font-size: 24px; color: #333; cursor: pointer; margin-top: 25px; box-shadow: 3px 3px 0px rgba(0,0,0,0.1); -webkit-tap-highlight-color: transparent; }}
+        .btn:active {{ transform: scale(0.95); background: #eee; }}
         .auto-save-msg {{ font-size:16px; color:#6a11cb; margin-top:15px; font-weight:bold; }}
-        #save-link {{ display:none; color: #6a11cb; font-size: 20px; margin-top: 15px; font-weight: bold; text-decoration: underline; cursor: pointer; }}
+        #save-link {{ display:none; color: #6a11cb; font-size: 18px; margin-top: 15px; font-weight: bold; text-decoration: underline; cursor: pointer; }}
+        
+        /* Mobile Hints */
+        .mobile-hint {{ display: none; font-size: 14px; opacity: 0.6; margin-top: 50px; }}
+        @media (pointer: coarse) {{ .mobile-hint {{ display: block; }} }}
     </style>
 </head>
 <body>
@@ -642,22 +666,25 @@ def render_game_html(mis_user):
         <div id="score-display">0</div>
         <div id="start-screen" class="menu-screen">
             <h1>Doodle Jump</h1>
-            <p>Use Arrows / Touch sides</p>
-            <button class="btn" onclick="startGame()">Play</button>
+            <p>Tap Left / Right sides</p>
+            <p style="font-size: 14px; opacity: 0.7;">(or use Arrow Keys)</p>
+            <button class="btn" onclick="startGame()">Play Now</button>
         </div>
         <div id="game-over-screen" class="menu-screen">
-            <h1>game over!</h1>
-            <p>score: <span id="final-score">0</span></p>
-            <p>high score: <span id="high-score">0</span></p>
+            <h1>Game Over!</h1>
+            <p>Score: <span id="final-score">0</span></p>
+            <p>High Score: <span id="high-score">0</span></p>
             <div id="auto-msg" class="auto-save-msg">Saving score...</div>
             <a id="save-link" href="#" target="_top">CLICK TO SAVE SCORE</a>
-            <button class="btn" onclick="startGame()" style="margin-top:40px;">play again</button>
+            <button class="btn" onclick="startGame()" style="margin-top:30px;">Play Again</button>
         </div>
     </div>
 </div>
 <script>
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
+    
+    // Game Physics
     const GRAVITY = 0.375; const JUMP_FORCE = -13.81; const MOVE_SPEED = 8.12;
     const GAME_W = 400; const GAME_H = 600;
     const USER_MIS = "{mis_user}";
@@ -668,16 +695,51 @@ def render_game_html(mis_user):
     const doodler = {{ x: GAME_W / 2 - 20, y: GAME_H - 150, w: 60, h: 60, vx: 0, vy: 0, dir: 1 }};
     const keys = {{ left: false, right: false }};
     
+    // --- INPUT HANDLING (PC) ---
     window.addEventListener('keydown', e => {{ if(e.key==="ArrowLeft") keys.left=true; if(e.key==="ArrowRight") keys.right=true; }});
     window.addEventListener('keyup', e => {{ if(e.key==="ArrowLeft") keys.left=false; if(e.key==="ArrowRight") keys.right=false; }});
+
+    // --- INPUT HANDLING (MOBILE FIX) ---
+    // Prevent default touch actions (scrolling)
+    canvas.addEventListener('touchmove', function(e) {{ e.preventDefault(); }}, {{ passive: false }});
+    
     canvas.addEventListener('touchstart', e => {{
+        e.preventDefault(); // Stop double-tap zoom etc
+        handleTouch(e);
+    }}, {{ passive: false }});
+
+    canvas.addEventListener('touchmove', e => {{
+        e.preventDefault(); 
+        handleTouch(e); // Allow sliding finger to switch direction
+    }}, {{ passive: false }});
+
+    canvas.addEventListener('touchend', e => {{ 
         e.preventDefault();
-        const touchX = e.touches[0].clientX;
-        const rect = canvas.getBoundingClientRect();
-        const x = touchX - rect.left;
-        if(x < GAME_W/2) keys.left = true; else keys.right = true;
+        keys.left = false; 
+        keys.right = false; 
     }});
-    canvas.addEventListener('touchend', e => {{ keys.left = false; keys.right = false; }});
+
+    function handleTouch(e) {{
+        if(e.touches.length === 0) return;
+        
+        const touch = e.touches[0];
+        const rect = canvas.getBoundingClientRect();
+        
+        // CRITICAL: Calculate scaling factor because CSS width != Canvas width
+        const scaleX = canvas.width / rect.width;
+        
+        // Get X relative to canvas
+        const clickX = (touch.clientX - rect.left) * scaleX;
+        
+        // Logic: Left half vs Right half of the game world
+        if(clickX < GAME_W / 2) {{
+            keys.left = true;
+            keys.right = false;
+        }} else {{
+            keys.left = false;
+            keys.right = true;
+        }}
+    }}
 
     function init() {{
         platforms = []; brokenParts = []; score = 0;
@@ -745,39 +807,22 @@ def render_game_html(mis_user):
         goScreen.classList.remove('hidden'); void goScreen.offsetWidth; goScreen.classList.add('slide-up');
         document.getElementById('score-display').classList.add('fade-out');
 
-        // AUTO SAVE LOGIC (IMPROVED for Reliability)
-        // Try to get base URL from document.referrer (more reliable in iframes)
-        // or fallback to window.parent location if same origin.
-        
         let baseUrl = "";
         try {{
-            baseUrl = document.referrer;
-            if (!baseUrl || baseUrl === "") {{
-               baseUrl = window.parent.location.href;
-            }}
-        }} catch(e) {{
-            console.log("CORS blocked parent access, using fallback");
-        }}
+            baseUrl = document.referrer || window.parent.location.href;
+        }} catch(e) {{ console.log("CORS blocked parent access"); }}
         
         if (baseUrl) {{
             try {{
                 const url = new URL(baseUrl);
                 url.searchParams.set('score', score);
                 url.searchParams.set('user', USER_MIS);
-                
                 const saveUrl = url.toString();
                 const fallbackLink = document.getElementById('save-link');
-                const autoMsg = document.getElementById('auto-msg');
-                
                 fallbackLink.href = saveUrl;
-                
-                // Try automatic redirect on the TOP window (breaking out of iframe)
-                setTimeout(() => {{
-                    window.top.location.href = saveUrl;
-                }}, 800);
-            }} catch(e) {{
-                // URL construction failed
-            }}
+                fallbackLink.style.display = 'block';
+                setTimeout(() => {{ window.top.location.href = saveUrl; }}, 1000);
+            }} catch(e) {{ }}
         }}
     }}
 
@@ -832,8 +877,8 @@ def render_game_html(mis_user):
         document.getElementById('start-screen').classList.add('hidden');
         const goScreen = document.getElementById('game-over-screen'); goScreen.classList.remove('slide-up');
         document.getElementById('score-display').classList.remove('fade-out');
-        document.getElementById('save-link').style.display = 'none'; // Reset link
-        document.getElementById('auto-msg').style.display = 'block'; // Reset msg
+        document.getElementById('save-link').style.display = 'none';
+        document.getElementById('auto-msg').style.display = 'block';
         isGameOverAnimating = false; init();
         if (!gameRunning) {{ gameRunning = true; requestAnimationFrame(loop); }}
     }}
@@ -841,6 +886,7 @@ def render_game_html(mis_user):
 </script>
 </body>
 </html>
+"""
 """
 
 # --------------------------------------------------
@@ -1105,3 +1151,4 @@ st.markdown(f"""
     Student Portal © 2026 • Built by <span style="color:#6a11cb; font-weight:700">IRONDEM2921 [AIML]</span>
 </div>
 """, unsafe_allow_html=True)
+
