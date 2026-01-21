@@ -24,6 +24,10 @@ if 'theme' not in st.session_state:
 if 'selected_lb_branch' not in st.session_state:
     st.session_state.selected_lb_branch = "CSE"  # Default start
 
+# Initialize Temporary Score Cache (For Real-time updates)
+if 'latest_game_data' not in st.session_state:
+    st.session_state.latest_game_data = None
+
 def toggle_theme():
     st.session_state.theme = 'dark' if st.session_state.theme == 'light' else 'light'
 
@@ -885,7 +889,7 @@ if 'attendance' not in st.session_state:
     st.session_state.attendance = load_attendance()
 
 # -------------------------------------------------------
-# AUTO-SAVE SCORE HANDLER (IMPROVED)
+# AUTO-SAVE SCORE HANDLER (OPTIMISTIC UPDATE)
 # -------------------------------------------------------
 try:
     # Retrieve Params (Streamlit > 1.30 syntax)
@@ -903,17 +907,23 @@ try:
             _, _, name, branch = get_schedule(st.session_state.mis_no, sub_dfs, sched_df)
             full_leaderboard_df = get_leaderboard_data()
             
-            # 2. Get Current High Scores
-            # Overall College High
+            # 2. Get Current High Scores (Before update)
             overall_high, _, _ = get_overall_highest(full_leaderboard_df)
-            # Branch High
             branch_high, _ = get_branch_highest(full_leaderboard_df, branch)
             
-            # 3. Save Score to Sheet (Always log it)
+            # 3. Save Score to Sheet (Log it)
             success, msg = update_leaderboard_score(name, branch, current_score)
             
             if success:
-                # 4. Feedback Messages & Celebrations
+                # 4. OPTIMISTIC UPDATE: Store in Session State
+                # This ensures the Yellow Box updates even if the Sheet API is slow
+                st.session_state.latest_game_data = {
+                    "Branch": branch,
+                    "Name": name,
+                    "Score": current_score
+                }
+
+                # 5. Feedback Messages & Celebrations
                 if current_score > overall_high:
                     st.toast(f"👑 NEW COLLEGE RECORD! {current_score}", icon="🏆")
                     st.balloons()
@@ -928,10 +938,10 @@ try:
         else:
             st.error(f"Security Warning: Score mismatch. Logged in as {st.session_state.mis_no}, but score received for {user_check}.")
         
-        # 5. Clear URL Params to prevent infinite loop or re-saving on refresh
+        # 6. Clear URL Params
         st.query_params.clear()
         # Rerun to refresh the UI with new data
-        time.sleep(1) # Small delay to ensure toast is seen
+        time.sleep(0.5) 
         st.rerun()
         
 except Exception as e:
@@ -942,7 +952,6 @@ sub_dfs, sched_df, link_map = load_data()
 # HEADER with Theme Toggle
 h1_col, toggle_col = st.columns([8, 1])
 with h1_col:
-    # Defined as a variable to prevent SyntaxError with emojis
     header_html = """
     <h1 style='text-align: left; background: linear-gradient(to right, #6a11cb, #2575fc); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-size: 3em; font-weight: 800; padding-top:10px;'>
     ✨ Smart Semester Timetable
@@ -1078,7 +1087,16 @@ else:
             st.markdown("""<h3 style="font-size: 28px; font-weight: 700; margin-bottom: 20px; background: linear-gradient(to right, #6a11cb, #fbc2eb); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">🎮 Stress Buster Leaderboard</h3>""", unsafe_allow_html=True)
 
             with st.expander("Play & View High Scores", expanded=False):
+                # 1. Fetch data from Cloud (might be stale)
                 full_leaderboard_df = get_leaderboard_data()
+                
+                # 2. OPTIMISTIC UI FIX: Merge with latest score in memory
+                # If the user just played, their score is in st.session_state.latest_game_data
+                if st.session_state.latest_game_data:
+                    # Create a 1-row DataFrame
+                    new_row = pd.DataFrame([st.session_state.latest_game_data])
+                    # Concatenate with existing data so calculations include the fresh score
+                    full_leaderboard_df = pd.concat([full_leaderboard_df, new_row], ignore_index=True)
                 
                 col_ctrl, col_stats = st.columns([1, 2])
                 with col_ctrl:
