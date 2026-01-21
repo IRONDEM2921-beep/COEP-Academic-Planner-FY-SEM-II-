@@ -216,54 +216,63 @@ table.custom-grid {{ width: 100%; min-width: 1000px; border-collapse: separate; 
 }}
 [data-testid="stExpander"] summary svg {{ fill: var(--text-color) !important; color: var(--text-color) !important; }}
 
-/* --- DROPDOWN (SELECTBOX) CRITICAL FIXES --- */
+/* --- DROPDOWN (SELECTBOX) FIXED & RESPONSIVE --- */
 
-/* 1. Force the dropdown CONTAINER to accept styling */
-div[data-baseweb="select"] {{
+/* 1. The Container - Use Theme Variables */
+div[data-baseweb="select"] > div {
+    background-color: var(--card-bg) !important;
+    border: 1px solid rgba(128, 128, 128, 0.2);
+    color: var(--text-color) !important;
+    border-radius: 12px !important;
+}
+
+/* 2. The Text inside the box (Selected Value) */
+div[data-baseweb="select"] div {
+    color: var(--text-color) !important;
+    font-weight: 600;
+}
+
+/* 3. The SVG Arrow Icon - Ensure it is visible */
+div[data-baseweb="select"] svg {
+    fill: var(--text-color) !important;
+}
+
+/* 4. The Dropdown Menu List (Popover) */
+ul[data-baseweb="menu"] {
+    background-color: var(--card-bg) !important;
+    border: 1px solid rgba(128, 128, 128, 0.2) !important;
+    box-shadow: 0 4px 20px var(--card-shadow) !important;
+    padding: 5px !important;
+    border-radius: 12px !important;
+    /* Fix for mobile/laptop z-index layering */
+    z-index: 9999 !important; 
+}
+
+/* 5. List Items (Options) */
+li[role="option"] {
     background-color: transparent !important;
-}}
+    color: var(--text-color) !important;
+    border-bottom: 1px solid rgba(128,128,128,0.1);
+    margin-bottom: 2px;
+    border-radius: 8px;
+}
 
-/* 2. NUCLEAR OPTION: Make ALL text inside the Select Box RED */
-div[data-baseweb="select"] * {{
-    color: #ff4b4b !important;
-    font-weight: 700 !important;
-    -webkit-text-fill-color: #ff4b4b !important;
-}}
+/* 6. Text inside List Items */
+li[role="option"] div {
+    color: var(--text-color) !important;
+    font-weight: 500 !important;
+}
 
-/* 3. The Dropdown Menu List (Popover) - FIXED POSITIONING */
-ul[data-baseweb="menu"] {{
-    background-color: #0e1117 !important; 
-    border: 1px solid rgba(255,255,255,0.2) !important;
-    /* REMOVED 'position: fixed' to fix scrolling detachment */
-    /* Ensure z-index is high enough to float above everything */
-    z-index: 9999 !important;
-}}
-
-/* 4. List Items (Options) */
-li[role="option"] {{
-    background-color: #0e1117 !important;
-}}
-
-/* 5. Text inside List Items - Red Gradient */
-li[role="option"] div {{
-    background: -webkit-linear-gradient(45deg, #ff9a44, #fc6076) !important;
-    -webkit-background-clip: text !important;
-    -webkit-text-fill-color: transparent !important;
-    font-weight: 600 !important;
-    font-size: 15px !important;
-}}
-
-/* 6. Hover State */
-li[role="option"]:hover {{
-    background-color: rgba(255, 75, 75, 0.1) !important;
+/* 7. Hover & Selection State */
+li[role="option"]:hover, li[role="option"][aria-selected="true"] {
+    background-color: var(--table-row-hover) !important;
     cursor: pointer;
-}}
+}
 
-div[data-baseweb="select"] svg {{
-    fill: #ff4b4b !important; 
-}}
-</style>
-""", unsafe_allow_html=True)
+li[role="option"]:hover div, li[role="option"][aria-selected="true"] div {
+    color: #6a11cb !important;
+    font-weight: 700 !important;
+}
 
 # --------------------------------------------------
 # 4. HELPERS
@@ -1159,4 +1168,5 @@ st.markdown(f"""
     Student Portal © 2026 • Built by <span style="color:#6a11cb; font-weight:700">IRONDEM2921 [AIML]</span>
 </div>
 """, unsafe_allow_html=True)
+
 
