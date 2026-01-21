@@ -216,25 +216,25 @@ table.custom-grid {{ width: 100%; min-width: 1000px; border-collapse: separate; 
 }}
 [data-testid="stExpander"] summary svg {{ fill: var(--text-color) !important; color: var(--text-color) !important; }}
 
-/* --- DROPDOWN (SELECTBOX) FIXED & RESPONSIVE --- */
+/* --- DROPDOWN (SELECTBOX) FIXED & RESPONSIVE (RED FONT) --- */
 
 /* 1. The Container - Use Theme Variables */
 div[data-baseweb="select"] > div {{
     background-color: var(--card-bg) !important;
     border: 1px solid rgba(128, 128, 128, 0.2);
-    color: var(--text-color) !important;
+    color: red !important; /* RED FONT */
     border-radius: 12px !important;
 }}
 
 /* 2. The Text inside the box (Selected Value) */
 div[data-baseweb="select"] div {{
-    color: var(--text-color) !important;
+    color: red !important; /* RED FONT */
     font-weight: 600;
 }}
 
 /* 3. The SVG Arrow Icon - Ensure it is visible */
 div[data-baseweb="select"] svg {{
-    fill: var(--text-color) !important;
+    fill: red !important; /* RED ICON */
 }}
 
 /* 4. The Dropdown Menu List (Popover) */
@@ -244,14 +244,13 @@ ul[data-baseweb="menu"] {{
     box-shadow: 0 4px 20px var(--card-shadow) !important;
     padding: 5px !important;
     border-radius: 12px !important;
-    /* Fix for mobile/laptop z-index layering */
     z-index: 9999 !important; 
 }}
 
 /* 5. List Items (Options) */
 li[role="option"] {{
     background-color: transparent !important;
-    color: var(--text-color) !important;
+    color: red !important; /* RED FONT */
     border-bottom: 1px solid rgba(128,128,128,0.1);
     margin-bottom: 2px;
     border-radius: 8px;
@@ -259,7 +258,7 @@ li[role="option"] {{
 
 /* 6. Text inside List Items */
 li[role="option"] div {{
-    color: var(--text-color) !important;
+    color: red !important; /* RED FONT */
     font-weight: 500 !important;
 }}
 
@@ -270,7 +269,7 @@ li[role="option"]:hover, li[role="option"][aria-selected="true"] {{
 }}
 
 li[role="option"]:hover div, li[role="option"][aria-selected="true"] div {{
-    color: #6a11cb !important;
+    color: red !important; /* RED FONT */
     font-weight: 700 !important;
 }}
 </style>
@@ -1114,7 +1113,7 @@ else:
                     selected_branch_filter = "All"
                     if view_mode == "By Branch":
                         existing_branches = full_leaderboard_df['Branch'].unique().tolist() if not full_leaderboard_df.empty else []
-                        defaults = ["AIML", "CSE", "IT", "ENTC", "MECH", "CIVIL", "INSTR"]
+                        defaults = ["CSE", "AIML", "MECH", "ELECTRICAL", "ENTC", "CIVIL", "MANUFACTURING", "INSTRU"]
                         all_branches = sorted(list(set(existing_branches + defaults)))
                         selected_branch_filter = st.selectbox("Select Branch", all_branches, index=all_branches.index(branch) if branch in all_branches else 0)
 
