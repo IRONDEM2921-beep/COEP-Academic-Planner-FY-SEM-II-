@@ -902,7 +902,7 @@ def render_game_html(mis_user):
 </body>
 </html>
 """
-"""
+
 # --------------------------------------------------
 # 7. MAIN APPLICATION
 # --------------------------------------------------
@@ -1159,3 +1159,4 @@ st.markdown(f"""
     Student Portal © 2026 • Built by <span style="color:#6a11cb; font-weight:700">IRONDEM2921 [AIML]</span>
 </div>
 """, unsafe_allow_html=True)
+
