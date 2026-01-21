@@ -959,10 +959,10 @@ sub_dfs, sched_df, link_map = load_data()
 h1_col, toggle_col = st.columns([8, 1])
 with h1_col:
     st.markdown("""
-    <h1 style='text-align: left; background: linear-gradient(to right, #6a11cb, #2575fc); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-size: 3em; font-weight: 800; padding-top:10px;'>
-    ✨ Smart Semester Timetable
-    </h1>
-    """, unsafe_allow_html=True)
+<h1 style='text-align: left; background: linear-gradient(to right, #6a11cb, #2575fc); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-size: 3em; font-weight: 800; padding-top:10px;'>
+✨ Smart Semester Timetable
+</h1>
+""", unsafe_allow_html=True)
 
 with toggle_col:
     st.write("") 
