@@ -115,18 +115,37 @@ div[data-baseweb="input"] {{
 div[data-baseweb="input"] input {{ color: white !important; caret-color: white; }}
 div[data-testid="stDateInput"] input {{ color: #ffffff !important; font-weight: 600; }}
 
-/* --- BUTTONS --- */
+/* --- BUTTONS (UNIFORM SIZE FIX) --- */
+/* This targets both Primary and Secondary buttons */
+div.stButton > button {{
+    width: 100% !important;
+    height: 60px !important;       /* FIXED HEIGHT for uniformity */
+    min-height: 60px !important;   /* Force minimum height */
+    white-space: normal !important; /* Allow text wrapping for "MANUFACTURING" */
+    line-height: 1.1 !important;    /* Tighter line height for wrapped text */
+    padding: 5px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    border-radius: 15px !important; /* Rounded card look */
+    font-size: 14px !important;
+}}
+
 div.stButton > button[kind="primary"] {{
     background: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%) !important;
-    border: none !important; border-radius: 50px !important; font-weight: 600;
-    box-shadow: 0 4px 10px rgba(106, 17, 203, 0.2); transition: transform 0.2s;
+    border: none !important; 
+    font-weight: 700 !important;
+    box-shadow: 0 4px 10px rgba(106, 17, 203, 0.2); 
+    transition: transform 0.2s;
 }}
 div.stButton > button[kind="primary"] * {{ color: #ffffff !important; }}
 div.stButton > button[kind="primary"]:hover {{ transform: translateY(-2px); box-shadow: 0 6px 15px rgba(106, 17, 203, 0.3); }}
 
 div.stButton > button[kind="secondary"] {{
-    background-color: var(--sec-btn-bg) !important; color: var(--sec-btn-text) !important; 
-    border: 2px solid #6a11cb !important; border-radius: 50px !important; font-weight: 600;
+    background-color: var(--sec-btn-bg) !important; 
+    color: var(--sec-btn-text) !important; 
+    border: 2px solid #6a11cb !important; 
+    font-weight: 600 !important;
 }}
 div.stButton > button[kind="secondary"]:hover {{ background-color: var(--table-row-hover) !important; }}
 
