@@ -21,7 +21,6 @@ if 'theme' not in st.session_state:
     st.session_state.theme = 'light'
 
 # Initialize Leaderboard Branch Selection State
-# Updated default to Full Name
 if 'selected_lb_branch' not in st.session_state:
     st.session_state.selected_lb_branch = "Computer Science and Engineering"
 
@@ -120,19 +119,19 @@ div[data-baseweb="input"] {{
 div[data-baseweb="input"] input {{ color: white !important; caret-color: white; }}
 div[data-testid="stDateInput"] input {{ color: #ffffff !important; font-weight: 600; }}
 
-/* --- BUTTONS (UNIFORM SIZE CARD FIX) --- */
+/* --- BUTTONS (UNIFORM SIZE CARD FIX - 2 COLUMN LAYOUT) --- */
 div.stButton > button {{
     width: 100% !important;
-    height: 85px !important;        /* INCREASED HEIGHT for long names */
-    min-height: 85px !important;
+    height: 80px !important;        /* FIXED HEIGHT */
+    min-height: 80px !important;
     white-space: normal !important; /* TEXT WRAPPING */
     line-height: 1.2 !important;
-    padding: 4px !important;
+    padding: 8px !important;
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
     border-radius: 15px !important;
-    font-size: 11px !important;     /* SLIGHTLY SMALLER FONT for long names */
+    font-size: 13px !important;     /* Readable font size */
     text-align: center !important;
 }}
 
@@ -1118,10 +1117,10 @@ else:
                             "Metallurgy and Materials Technology"
                         ]
                         
-                        # Create a 4-column grid for buttons
-                        b_cols = st.columns(4)
+                        # Create a 2-column grid for buttons
+                        b_cols = st.columns(2)
                         for i, br_name in enumerate(branch_list):
-                            with b_cols[i % 4]:
+                            with b_cols[i % 2]:
                                 # If selected, make it PRIMARY (highlighted), else SECONDARY
                                 btn_type = "primary" if st.session_state.selected_lb_branch == br_name else "secondary"
                                 if st.button(br_name, key=f"br_btn_{i}", type=btn_type, use_container_width=True):
