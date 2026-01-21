@@ -1117,7 +1117,7 @@ else:
                             "Metallurgy and Materials Technology"
                         ]
                         
-                        # Create a 2-column grid for buttons
+                        # Create a 2-column grid for buttons (CHANGED FROM 4 TO 2)
                         b_cols = st.columns(2)
                         for i, br_name in enumerate(branch_list):
                             with b_cols[i % 2]:
