@@ -115,19 +115,18 @@ div[data-baseweb="input"] {{
 div[data-baseweb="input"] input {{ color: white !important; caret-color: white; }}
 div[data-testid="stDateInput"] input {{ color: #ffffff !important; font-weight: 600; }}
 
-/* --- BUTTONS (UNIFORM SIZE FIX) --- */
-/* This targets both Primary and Secondary buttons */
+/* --- BUTTONS (UNIFORM SIZE CARD FIX) --- */
 div.stButton > button {{
     width: 100% !important;
-    height: 60px !important;       /* FIXED HEIGHT for uniformity */
-    min-height: 60px !important;   /* Force minimum height */
-    white-space: normal !important; /* Allow text wrapping for "MANUFACTURING" */
-    line-height: 1.1 !important;    /* Tighter line height for wrapped text */
+    height: 60px !important;        /* FIXED HEIGHT */
+    min-height: 60px !important;
+    white-space: normal !important; /* TEXT WRAPPING */
+    line-height: 1.1 !important;
     padding: 5px !important;
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
-    border-radius: 15px !important; /* Rounded card look */
+    border-radius: 15px !important;
     font-size: 14px !important;
 }}
 
@@ -667,7 +666,6 @@ def render_game_html(mis_user):
         .btn:active {{ transform: scale(0.96); box-shadow: 2px 2px 0px rgba(0,0,0,0.1); background: #f4f4f4; }}
 
         .auto-save-msg {{ font-size:16px; color:#6a11cb; margin-top:15px; font-weight:bold; }}
-        #save-link {{ display:none; color: #6a11cb; font-size: 18px; margin-top: 15px; font-weight: bold; text-decoration: underline; cursor: pointer; }}
     </style>
 </head>
 <body>
@@ -687,7 +685,6 @@ def render_game_html(mis_user):
             <p>Score: <span id="final-score">0</span></p>
             <p>Best: <span id="high-score">0</span></p>
             <div id="auto-msg" class="auto-save-msg">Saving score...</div>
-            <a id="save-link" href="#" target="_top">CLICK TO SAVE SCORE</a>
             <button class="btn" onclick="startGame()" style="margin-top:25px;">Play Again</button>
         </div>
     </div>
@@ -804,11 +801,10 @@ def render_game_html(mis_user):
                 const url = new URL(baseUrl);
                 url.searchParams.set('score', score);
                 url.searchParams.set('user', USER_MIS);
-                const saveUrl = url.toString();
-                const fallbackLink = document.getElementById('save-link');
-                fallbackLink.href = saveUrl;
-                fallbackLink.style.display = 'block';
-                setTimeout(() => {{ window.top.location.href = saveUrl; }}, 1200);
+                
+                // AUTOMATICALLY REDIRECT TO SAVE SCORE (NO BUTTON CLICK NEEDED)
+                window.top.location.href = url.toString();
+                
             }} catch(e) {{ }}
         }}
     }}
@@ -864,7 +860,6 @@ def render_game_html(mis_user):
         document.getElementById('start-screen').classList.add('hidden');
         const goScreen = document.getElementById('game-over-screen'); goScreen.classList.remove('slide-up');
         document.getElementById('score-display').classList.remove('fade-out');
-        document.getElementById('save-link').style.display = 'none';
         document.getElementById('auto-msg').style.display = 'block';
         
         // FIX 4: Enable canvas pointer events so user can tap to move
@@ -890,42 +885,55 @@ if 'attendance' not in st.session_state:
     st.session_state.attendance = load_attendance()
 
 # -------------------------------------------------------
-# AUTO-SAVE SCORE HANDLER
+# AUTO-SAVE SCORE HANDLER (IMPROVED)
 # -------------------------------------------------------
 try:
     # Retrieve Params (Streamlit > 1.30 syntax)
     qp = st.query_params
-    new_score = qp.get("score")
+    new_score_str = qp.get("score")
     user_check = qp.get("user")
     
-    if new_score and user_check:
-        # Check against session state MIS
+    if new_score_str and user_check:
+        # Check against session state MIS for security
         if str(user_check).strip() == str(st.session_state.mis_no).strip():
-            score_val = int(new_score)
+            current_score = int(new_score_str)
             
-            # Fetch branch info
+            # 1. Fetch User Info & Current Leaderboard
             sub_dfs, sched_df, link_map = load_data()
             _, _, name, branch = get_schedule(st.session_state.mis_no, sub_dfs, sched_df)
+            full_leaderboard_df = get_leaderboard_data()
             
-            # Find previous high score
-            full_df_temp = get_leaderboard_data()
-            prev_high, _ = get_branch_highest(full_df_temp, branch)
+            # 2. Get Current High Scores
+            # Overall College High
+            overall_high, _, _ = get_overall_highest(full_leaderboard_df)
+            # Branch High
+            branch_high, _ = get_branch_highest(full_leaderboard_df, branch)
             
-            success, msg = update_leaderboard_score(name, branch, score_val)
+            # 3. Save Score to Sheet (Always log it)
+            success, msg = update_leaderboard_score(name, branch, current_score)
             
-            # Wait for API
-            time.sleep(2.0)
-            
-            if score_val > prev_high:
-                st.toast(f"🎉 New Personal Record: {score_val}!", icon="🏆")
+            if success:
+                # 4. Feedback Messages & Celebrations
+                if current_score > overall_high:
+                    st.toast(f"👑 NEW COLLEGE RECORD! {current_score}", icon="🏆")
+                    st.balloons()
+                elif current_score > branch_high:
+                    st.toast(f"🥇 NEW {branch} RECORD! {current_score}", icon="🔥")
+                    st.snow()
+                else:
+                    st.toast(f"Score saved: {current_score}", icon="✅")
             else:
-                st.toast(f"Score saved: {score_val}", icon="✅")
+                st.error(f"Failed to save score: {msg}")
+
         else:
-            st.error(f"Security Warning: Score mismatch. User in Link: '{user_check}' vs Logged In: '{st.session_state.mis_no}'")
+            st.error(f"Security Warning: Score mismatch. Logged in as {st.session_state.mis_no}, but score received for {user_check}.")
         
-        # Clear params and rerun
+        # 5. Clear URL Params to prevent infinite loop or re-saving on refresh
         st.query_params.clear()
+        # Rerun to refresh the UI with new data
+        time.sleep(1) # Small delay to ensure toast is seen
         st.rerun()
+        
 except Exception as e:
     pass
 
