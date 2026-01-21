@@ -219,26 +219,26 @@ table.custom-grid {{ width: 100%; min-width: 1000px; border-collapse: separate; 
 /* --- DROPDOWN (SELECTBOX) FIXED & RESPONSIVE --- */
 
 /* 1. The Container - Use Theme Variables */
-div[data-baseweb="select"] > div {
+div[data-baseweb="select"] > div {{
     background-color: var(--card-bg) !important;
     border: 1px solid rgba(128, 128, 128, 0.2);
     color: var(--text-color) !important;
     border-radius: 12px !important;
-}
+}}
 
 /* 2. The Text inside the box (Selected Value) */
-div[data-baseweb="select"] div {
+div[data-baseweb="select"] div {{
     color: var(--text-color) !important;
     font-weight: 600;
-}
+}}
 
 /* 3. The SVG Arrow Icon - Ensure it is visible */
-div[data-baseweb="select"] svg {
+div[data-baseweb="select"] svg {{
     fill: var(--text-color) !important;
-}
+}}
 
 /* 4. The Dropdown Menu List (Popover) */
-ul[data-baseweb="menu"] {
+ul[data-baseweb="menu"] {{
     background-color: var(--card-bg) !important;
     border: 1px solid rgba(128, 128, 128, 0.2) !important;
     box-shadow: 0 4px 20px var(--card-shadow) !important;
@@ -246,33 +246,35 @@ ul[data-baseweb="menu"] {
     border-radius: 12px !important;
     /* Fix for mobile/laptop z-index layering */
     z-index: 9999 !important; 
-}
+}}
 
 /* 5. List Items (Options) */
-li[role="option"] {
+li[role="option"] {{
     background-color: transparent !important;
     color: var(--text-color) !important;
     border-bottom: 1px solid rgba(128,128,128,0.1);
     margin-bottom: 2px;
     border-radius: 8px;
-}
+}}
 
 /* 6. Text inside List Items */
-li[role="option"] div {
+li[role="option"] div {{
     color: var(--text-color) !important;
     font-weight: 500 !important;
-}
+}}
 
 /* 7. Hover & Selection State */
-li[role="option"]:hover, li[role="option"][aria-selected="true"] {
+li[role="option"]:hover, li[role="option"][aria-selected="true"] {{
     background-color: var(--table-row-hover) !important;
     cursor: pointer;
-}
+}}
 
-li[role="option"]:hover div, li[role="option"][aria-selected="true"] div {
+li[role="option"]:hover div, li[role="option"][aria-selected="true"] div {{
     color: #6a11cb !important;
     font-weight: 700 !important;
-}
+}}
+</style>
+""", unsafe_allow_html=True)
 
 # --------------------------------------------------
 # 4. HELPERS
@@ -1168,5 +1170,3 @@ st.markdown(f"""
     Student Portal © 2026 • Built by <span style="color:#6a11cb; font-weight:700">IRONDEM2921 [AIML]</span>
 </div>
 """, unsafe_allow_html=True)
-
-
