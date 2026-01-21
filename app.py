@@ -21,8 +21,9 @@ if 'theme' not in st.session_state:
     st.session_state.theme = 'light'
 
 # Initialize Leaderboard Branch Selection State
+# Updated default to Full Name
 if 'selected_lb_branch' not in st.session_state:
-    st.session_state.selected_lb_branch = "CSE"  # Default start
+    st.session_state.selected_lb_branch = "Computer Science and Engineering"
 
 # Initialize Temporary Score Cache (For Real-time updates)
 if 'latest_game_data' not in st.session_state:
@@ -122,16 +123,17 @@ div[data-testid="stDateInput"] input {{ color: #ffffff !important; font-weight: 
 /* --- BUTTONS (UNIFORM SIZE CARD FIX) --- */
 div.stButton > button {{
     width: 100% !important;
-    height: 60px !important;        /* FIXED HEIGHT */
-    min-height: 60px !important;
+    height: 85px !important;        /* INCREASED HEIGHT for long names */
+    min-height: 85px !important;
     white-space: normal !important; /* TEXT WRAPPING */
-    line-height: 1.1 !important;
-    padding: 5px !important;
+    line-height: 1.2 !important;
+    padding: 4px !important;
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
     border-radius: 15px !important;
-    font-size: 14px !important;
+    font-size: 11px !important;     /* SLIGHTLY SMALLER FONT for long names */
+    text-align: center !important;
 }}
 
 div.stButton > button[kind="primary"] {{
@@ -1105,7 +1107,16 @@ else:
                     if view_mode == "By Branch":
                         # Branch List as Cards (Buttons)
                         st.markdown("#### Select Branch:")
-                        branch_list = ["CSE", "AIML", "MECH", "ELECTRICAL", "ENTC", "CIVIL", "MANUFACTURING", "INSTRU"]
+                        branch_list = [
+                            "Artificial Intelligence and Machine Learning",
+                            "Civil Engineering",
+                            "Computer Science and Engineering",
+                            "Electrical Engineering",
+                            "Instrumentation and Control Engineering",
+                            "Mechanical Engineering",
+                            "Manufacturing Science and Engineering",
+                            "Metallurgy and Materials Technology"
+                        ]
                         
                         # Create a 4-column grid for buttons
                         b_cols = st.columns(4)
