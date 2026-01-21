@@ -612,7 +612,6 @@ def render_game_html(mis_user):
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <link href="https://fonts.googleapis.com/css2?family=Patrick+Hand&display=swap" rel="stylesheet">
     <style>
-        /* GLOBAL RESET */
         * {{ box-sizing: border-box; -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }}
         
         body {{ 
@@ -621,43 +620,55 @@ def render_game_html(mis_user):
             height: 100vh;
             background-color: transparent; 
             font-family: 'Patrick Hand', cursive; 
-            overflow: hidden; /* No scroll on body */
+            overflow: hidden;
         }}
 
         #game-container {{
             position: relative; 
-            /* Responsive Sizing */
-            width: 100%; 
-            max-width: 400px;
-            aspect-ratio: 2/3; 
-            max-height: 90vh;
-            
+            width: 100%; max-width: 400px;
+            aspect-ratio: 2/3; max-height: 90vh;
             background-color: {game_bg};
             background-image: linear-gradient({grid_line} 1px, transparent 1px), linear-gradient(90deg, {grid_line} 1px, transparent 1px);
             background-size: 15px 15px;
             box-shadow: 0 4px 20px rgba(0,0,0,0.15); 
             border-radius: 12px;
             overflow: hidden;
-            
-            /* CRITICAL: Disables browser scrolling/zooming on the game area */
             touch-action: none; 
         }}
 
         canvas {{ 
             display: block; 
-            width: 100%; height: 100%; /* Force canvas to fit container */
-            position: absolute; top: 0; left: 0; z-index: 10; 
+            width: 100%; height: 100%; 
+            position: absolute; top: 0; left: 0; 
+            
+            /* FIX 1: Canvas is now ABOVE the UI layer */
+            z-index: 20; 
+            
+            /* FIX 2: Initially let clicks pass through to the 'Play' button */
+            pointer-events: none; 
+            
             touch-action: none;
         }}
 
-        #ui-layer {{ position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 20; }}
+        #ui-layer {{ 
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
+            
+            /* FIX 1: UI is now BELOW the canvas */
+            z-index: 10; 
+            
+            pointer-events: none; 
+        }}
+
+        /* Make sure interactive elements inside UI are clickable */
+        .menu-screen {{ pointer-events: auto; }}
+        
         #score-display {{ position: absolute; top: 10px; left: 20px; font-size: 32px; color: #888; font-weight: bold; transition: opacity 0.3s; }}
         
         .menu-screen {{ 
             position: absolute; width: 100%; height: 100%; 
             background: rgba(255,255,255, 0.95); 
             display: flex; flex-direction: column; justify-content: center; align-items: center; 
-            pointer-events: auto; text-align: center; 
+            text-align: center; 
         }}
         
         #start-screen {{ top: 0; left: 0; transition: opacity 0.3s; }}
@@ -675,7 +686,7 @@ def render_game_html(mis_user):
             padding: 12px 35px; font-family: 'Patrick Hand', cursive; font-size: 24px; 
             color: #333; cursor: pointer; margin-top: 25px; 
             box-shadow: 4px 4px 0px rgba(0,0,0,0.1); 
-            -webkit-tap-highlight-color: transparent; /* Remove blue highlight on tap */
+            -webkit-tap-highlight-color: transparent;
         }}
         .btn:active {{ transform: scale(0.96); box-shadow: 2px 2px 0px rgba(0,0,0,0.1); background: #f4f4f4; }}
 
@@ -709,7 +720,6 @@ def render_game_html(mis_user):
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
     
-    // Physics Constants
     const GRAVITY = 0.375; const JUMP_FORCE = -13.81; const MOVE_SPEED = 8.12;
     const GAME_W = 400; const GAME_H = 600;
     const USER_MIS = "{mis_user}";
@@ -720,42 +730,26 @@ def render_game_html(mis_user):
     const doodler = {{ x: GAME_W / 2 - 20, y: GAME_H - 150, w: 60, h: 60, vx: 0, vy: 0, dir: 1 }};
     const keys = {{ left: false, right: false }};
     
-    // --- PC CONTROLS ---
+    // --- CONTROLS ---
     window.addEventListener('keydown', e => {{ if(e.key==="ArrowLeft") keys.left=true; if(e.key==="ArrowRight") keys.right=true; }});
     window.addEventListener('keyup', e => {{ if(e.key==="ArrowLeft") keys.left=false; if(e.key==="ArrowRight") keys.right=false; }});
 
-    // --- MOBILE CONTROLS (FIXED) ---
-    // 1. Prevent Default Scrolling
     canvas.addEventListener('touchmove', function(e) {{ e.preventDefault(); }}, {{ passive: false }});
     canvas.addEventListener('touchstart', function(e) {{ e.preventDefault(); }}, {{ passive: false }});
 
-    // 2. Handle Touch Logic
     const handleTouch = (e) => {{
         if(e.touches.length === 0) return;
         const touch = e.touches[0];
         const rect = canvas.getBoundingClientRect();
-        
-        // We calculate if the touch is on the Left (0-50%) or Right (50-100%) half of the VISIBLE element
-        // This avoids complex scaling math issues.
         const touchX = touch.clientX - rect.left;
         const middle = rect.width / 2;
-        
-        if (touchX < middle) {{
-            keys.left = true;
-            keys.right = false;
-        }} else {{
-            keys.left = false;
-            keys.right = true;
-        }}
+        if (touchX < middle) {{ keys.left = true; keys.right = false; }} 
+        else {{ keys.left = false; keys.right = true; }}
     }};
 
     canvas.addEventListener('touchstart', handleTouch, {{ passive: false }});
     canvas.addEventListener('touchmove', handleTouch, {{ passive: false }});
-    canvas.addEventListener('touchend', e => {{ 
-        e.preventDefault(); 
-        keys.left = false; 
-        keys.right = false; 
-    }});
+    canvas.addEventListener('touchend', e => {{ e.preventDefault(); keys.left = false; keys.right = false; }});
 
     function init() {{
         platforms = []; brokenParts = []; score = 0;
@@ -782,11 +776,8 @@ def render_game_html(mis_user):
         }}
         if (keys.left) {{ doodler.x -= MOVE_SPEED; doodler.dir = -1; }}
         if (keys.right) {{ doodler.x += MOVE_SPEED; doodler.dir = 1; }}
-        
-        // Wrap around screen
         if (doodler.x < -doodler.w/2) doodler.x = GAME_W - doodler.w/2;
         else if (doodler.x > GAME_W - doodler.w/2) doodler.x = -doodler.w/2;
-        
         doodler.vy += GRAVITY; doodler.y += doodler.vy;
         
         let centerX = doodler.x + doodler.w/2; let feetY = doodler.y + doodler.h;
@@ -821,15 +812,16 @@ def render_game_html(mis_user):
         document.getElementById('final-score').innerText = score;
         document.getElementById('high-score').innerText = highScore;
         
+        // FIX 3: Disable pointer events on canvas so user can click 'Play Again' behind it
+        canvas.style.pointerEvents = 'none';
+
         platforms = []; brokenParts = []; doodler.y = -70; doodler.vy = 0;
         const goScreen = document.getElementById('game-over-screen');
         goScreen.classList.remove('hidden'); void goScreen.offsetWidth; goScreen.classList.add('slide-up');
         document.getElementById('score-display').classList.add('fade-out');
 
         let baseUrl = "";
-        try {{
-            baseUrl = document.referrer || window.parent.location.href;
-        }} catch(e) {{ console.log("CORS blocked parent access"); }}
+        try {{ baseUrl = document.referrer || window.parent.location.href; }} catch(e) {{ }}
         
         if (baseUrl) {{
             try {{
@@ -898,6 +890,10 @@ def render_game_html(mis_user):
         document.getElementById('score-display').classList.remove('fade-out');
         document.getElementById('save-link').style.display = 'none';
         document.getElementById('auto-msg').style.display = 'block';
+        
+        // FIX 4: Enable canvas pointer events so user can tap to move
+        canvas.style.pointerEvents = 'auto';
+        
         isGameOverAnimating = false; init();
         if (!gameRunning) {{ gameRunning = true; requestAnimationFrame(loop); }}
     }}
@@ -905,7 +901,6 @@ def render_game_html(mis_user):
 </script>
 </body>
 </html>
-"""
 """
 """
 
@@ -1171,5 +1166,6 @@ st.markdown(f"""
     Student Portal © 2026 • Built by <span style="color:#6a11cb; font-weight:700">IRONDEM2921 [AIML]</span>
 </div>
 """, unsafe_allow_html=True)
+
 
 
