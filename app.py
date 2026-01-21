@@ -600,8 +600,7 @@ def calculate_semester_totals(timetable_entries):
 
 def render_game_html(mis_user):
     # Detect theme colors for game CSS
-    bg_color = current_theme['game_grid'] # Using grid color for contrast or keep simplified
-    # Hardcoding a clean background for consistency
+    bg_color = current_theme['game_grid'] 
     game_bg = "#fcfcf4"
     grid_line = "#e0dacc"
     
@@ -613,50 +612,75 @@ def render_game_html(mis_user):
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <link href="https://fonts.googleapis.com/css2?family=Patrick+Hand&display=swap" rel="stylesheet">
     <style>
+        /* GLOBAL RESET */
+        * {{ box-sizing: border-box; -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }}
+        
         body {{ 
             margin: 0; padding: 0; 
             display: flex; justify-content: center; align-items: center; 
-            height: 100vh; /* Full viewport height */
+            height: 100vh;
             background-color: transparent; 
             font-family: 'Patrick Hand', cursive; 
-            overflow: hidden; /* Prevent page scroll */
+            overflow: hidden; /* No scroll on body */
         }}
+
         #game-container {{
             position: relative; 
-            width: 100%; max-width: 400px; /* Responsive width */
-            aspect-ratio: 2/3; /* Maintain aspect ratio */
-            max-height: 95vh;
+            /* Responsive Sizing */
+            width: 100%; 
+            max-width: 400px;
+            aspect-ratio: 2/3; 
+            max-height: 90vh;
+            
             background-color: {game_bg};
             background-image: linear-gradient({grid_line} 1px, transparent 1px), linear-gradient(90deg, {grid_line} 1px, transparent 1px);
             background-size: 15px 15px;
-            box-shadow: 0 0 30px rgba(0,0,0,0.2); 
+            box-shadow: 0 4px 20px rgba(0,0,0,0.15); 
             border-radius: 12px;
             overflow: hidden;
-            touch-action: none; /* CRITICAL: Disables browser zooming/scrolling on the game */
+            
+            /* CRITICAL: Disables browser scrolling/zooming on the game area */
+            touch-action: none; 
         }}
+
         canvas {{ 
-            display: block; width: 100%; height: 100%; /* Fill container */
+            display: block; 
+            width: 100%; height: 100%; /* Force canvas to fit container */
             position: absolute; top: 0; left: 0; z-index: 10; 
-            pointer-events: auto; /* Ensure canvas gets events */
+            touch-action: none;
         }}
+
         #ui-layer {{ position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 20; }}
         #score-display {{ position: absolute; top: 10px; left: 20px; font-size: 32px; color: #888; font-weight: bold; transition: opacity 0.3s; }}
-        .menu-screen {{ position: absolute; width: 100%; height: 100%; background: rgba(255,255,255, 0.95); display: flex; flex-direction: column; justify-content: center; align-items: center; pointer-events: auto; text-align: center; }}
+        
+        .menu-screen {{ 
+            position: absolute; width: 100%; height: 100%; 
+            background: rgba(255,255,255, 0.95); 
+            display: flex; flex-direction: column; justify-content: center; align-items: center; 
+            pointer-events: auto; text-align: center; 
+        }}
+        
         #start-screen {{ top: 0; left: 0; transition: opacity 0.3s; }}
-        #game-over-screen {{ left: 0; top: 100%; transition: top 0.5s ease-out; }}
+        #game-over-screen {{ left: 0; top: 100%; transition: top 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275); }}
         #game-over-screen.slide-up {{ top: 0% !important; }}
+        
         .hidden {{ display: none !important; opacity: 0; }}
         .fade-out {{ opacity: 0; }}
-        h1 {{ font-size: 42px; color: #d32f2f; margin: 0 0 20px 0; transform: rotate(-3deg); text-shadow: 2px 2px 0px rgba(0,0,0,0.1); }}
+        
+        h1 {{ font-size: 42px; color: #d32f2f; margin: 0 0 10px 0; transform: rotate(-3deg); }}
         p {{ font-size: 20px; color: #444; margin: 5px 0; }}
-        .btn {{ background: #fff; border: 2px solid #333; border-radius: 8px; padding: 10px 30px; font-family: 'Patrick Hand', cursive; font-size: 24px; color: #333; cursor: pointer; margin-top: 25px; box-shadow: 3px 3px 0px rgba(0,0,0,0.1); -webkit-tap-highlight-color: transparent; }}
-        .btn:active {{ transform: scale(0.95); background: #eee; }}
+        
+        .btn {{ 
+            background: #fff; border: 2px solid #333; border-radius: 8px; 
+            padding: 12px 35px; font-family: 'Patrick Hand', cursive; font-size: 24px; 
+            color: #333; cursor: pointer; margin-top: 25px; 
+            box-shadow: 4px 4px 0px rgba(0,0,0,0.1); 
+            -webkit-tap-highlight-color: transparent; /* Remove blue highlight on tap */
+        }}
+        .btn:active {{ transform: scale(0.96); box-shadow: 2px 2px 0px rgba(0,0,0,0.1); background: #f4f4f4; }}
+
         .auto-save-msg {{ font-size:16px; color:#6a11cb; margin-top:15px; font-weight:bold; }}
         #save-link {{ display:none; color: #6a11cb; font-size: 18px; margin-top: 15px; font-weight: bold; text-decoration: underline; cursor: pointer; }}
-        
-        /* Mobile Hints */
-        .mobile-hint {{ display: none; font-size: 14px; opacity: 0.6; margin-top: 50px; }}
-        @media (pointer: coarse) {{ .mobile-hint {{ display: block; }} }}
     </style>
 </head>
 <body>
@@ -664,19 +688,20 @@ def render_game_html(mis_user):
     <canvas id="gameCanvas" width="400" height="600"></canvas>
     <div id="ui-layer">
         <div id="score-display">0</div>
+        
         <div id="start-screen" class="menu-screen">
             <h1>Doodle Jump</h1>
-            <p>Tap Left / Right sides</p>
-            <p style="font-size: 14px; opacity: 0.7;">(or use Arrow Keys)</p>
+            <p>Tap <b>Left</b> or <b>Right</b> side</p>
             <button class="btn" onclick="startGame()">Play Now</button>
         </div>
+        
         <div id="game-over-screen" class="menu-screen">
             <h1>Game Over!</h1>
             <p>Score: <span id="final-score">0</span></p>
-            <p>High Score: <span id="high-score">0</span></p>
+            <p>Best: <span id="high-score">0</span></p>
             <div id="auto-msg" class="auto-save-msg">Saving score...</div>
             <a id="save-link" href="#" target="_top">CLICK TO SAVE SCORE</a>
-            <button class="btn" onclick="startGame()" style="margin-top:30px;">Play Again</button>
+            <button class="btn" onclick="startGame()" style="margin-top:25px;">Play Again</button>
         </div>
     </div>
 </div>
@@ -684,7 +709,7 @@ def render_game_html(mis_user):
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
     
-    // Game Physics
+    // Physics Constants
     const GRAVITY = 0.375; const JUMP_FORCE = -13.81; const MOVE_SPEED = 8.12;
     const GAME_W = 400; const GAME_H = 600;
     const USER_MIS = "{mis_user}";
@@ -695,51 +720,42 @@ def render_game_html(mis_user):
     const doodler = {{ x: GAME_W / 2 - 20, y: GAME_H - 150, w: 60, h: 60, vx: 0, vy: 0, dir: 1 }};
     const keys = {{ left: false, right: false }};
     
-    // --- INPUT HANDLING (PC) ---
+    // --- PC CONTROLS ---
     window.addEventListener('keydown', e => {{ if(e.key==="ArrowLeft") keys.left=true; if(e.key==="ArrowRight") keys.right=true; }});
     window.addEventListener('keyup', e => {{ if(e.key==="ArrowLeft") keys.left=false; if(e.key==="ArrowRight") keys.right=false; }});
 
-    // --- INPUT HANDLING (MOBILE FIX) ---
-    // Prevent default touch actions (scrolling)
+    // --- MOBILE CONTROLS (FIXED) ---
+    // 1. Prevent Default Scrolling
     canvas.addEventListener('touchmove', function(e) {{ e.preventDefault(); }}, {{ passive: false }});
-    
-    canvas.addEventListener('touchstart', e => {{
-        e.preventDefault(); // Stop double-tap zoom etc
-        handleTouch(e);
-    }}, {{ passive: false }});
+    canvas.addEventListener('touchstart', function(e) {{ e.preventDefault(); }}, {{ passive: false }});
 
-    canvas.addEventListener('touchmove', e => {{
-        e.preventDefault(); 
-        handleTouch(e); // Allow sliding finger to switch direction
-    }}, {{ passive: false }});
-
-    canvas.addEventListener('touchend', e => {{ 
-        e.preventDefault();
-        keys.left = false; 
-        keys.right = false; 
-    }});
-
-    function handleTouch(e) {{
+    // 2. Handle Touch Logic
+    const handleTouch = (e) => {{
         if(e.touches.length === 0) return;
-        
         const touch = e.touches[0];
         const rect = canvas.getBoundingClientRect();
         
-        // CRITICAL: Calculate scaling factor because CSS width != Canvas width
-        const scaleX = canvas.width / rect.width;
+        // We calculate if the touch is on the Left (0-50%) or Right (50-100%) half of the VISIBLE element
+        // This avoids complex scaling math issues.
+        const touchX = touch.clientX - rect.left;
+        const middle = rect.width / 2;
         
-        // Get X relative to canvas
-        const clickX = (touch.clientX - rect.left) * scaleX;
-        
-        // Logic: Left half vs Right half of the game world
-        if(clickX < GAME_W / 2) {{
+        if (touchX < middle) {{
             keys.left = true;
             keys.right = false;
         }} else {{
             keys.left = false;
             keys.right = true;
         }}
-    }}
+    }};
+
+    canvas.addEventListener('touchstart', handleTouch, {{ passive: false }});
+    canvas.addEventListener('touchmove', handleTouch, {{ passive: false }});
+    canvas.addEventListener('touchend', e => {{ 
+        e.preventDefault(); 
+        keys.left = false; 
+        keys.right = false; 
+    }});
 
     function init() {{
         platforms = []; brokenParts = []; score = 0;
@@ -766,8 +782,11 @@ def render_game_html(mis_user):
         }}
         if (keys.left) {{ doodler.x -= MOVE_SPEED; doodler.dir = -1; }}
         if (keys.right) {{ doodler.x += MOVE_SPEED; doodler.dir = 1; }}
+        
+        // Wrap around screen
         if (doodler.x < -doodler.w/2) doodler.x = GAME_W - doodler.w/2;
         else if (doodler.x > GAME_W - doodler.w/2) doodler.x = -doodler.w/2;
+        
         doodler.vy += GRAVITY; doodler.y += doodler.vy;
         
         let centerX = doodler.x + doodler.w/2; let feetY = doodler.y + doodler.h;
@@ -821,7 +840,7 @@ def render_game_html(mis_user):
                 const fallbackLink = document.getElementById('save-link');
                 fallbackLink.href = saveUrl;
                 fallbackLink.style.display = 'block';
-                setTimeout(() => {{ window.top.location.href = saveUrl; }}, 1000);
+                setTimeout(() => {{ window.top.location.href = saveUrl; }}, 1200);
             }} catch(e) {{ }}
         }}
     }}
@@ -886,6 +905,7 @@ def render_game_html(mis_user):
 </script>
 </body>
 </html>
+"""
 """
 """
 
@@ -1151,4 +1171,5 @@ st.markdown(f"""
     Student Portal © 2026 • Built by <span style="color:#6a11cb; font-weight:700">IRONDEM2921 [AIML]</span>
 </div>
 """, unsafe_allow_html=True)
+
 
