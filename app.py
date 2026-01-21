@@ -244,7 +244,10 @@ ul[data-baseweb="menu"] {{
     box-shadow: 0 4px 20px var(--card-shadow) !important;
     padding: 5px !important;
     border-radius: 12px !important;
-    z-index: 9999 !important; 
+    z-index: 9999 !important;
+    
+    /* FIX: Force absolute positioning to prevent detachment on scroll */
+    position: absolute !important;
 }}
 
 /* 5. List Items (Options) */
