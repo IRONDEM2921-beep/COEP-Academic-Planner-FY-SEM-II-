@@ -24,12 +24,13 @@ if 'theme' not in st.session_state:
 if 'selected_lb_branch' not in st.session_state:
     st.session_state.selected_lb_branch = "Computer Science and Engineering"
 
+# Initialize User MIS State
+if 'mis_no' not in st.session_state:
+    st.session_state.mis_no = ""
+
 # Initialize Temporary Score Cache (For Real-time updates)
 if 'latest_game_data' not in st.session_state:
     st.session_state.latest_game_data = None
-
-def toggle_theme():
-    st.session_state.theme = 'dark' if st.session_state.theme == 'light' else 'light'
 
 # --------------------------------------------------
 # 2. CONSTANTS & DATES
@@ -40,230 +41,40 @@ SEMESTER_START = date(2026, 1, 12)
 SEMESTER_END = date(2026, 5, 7)
 
 # --------------------------------------------------
-# 3. DYNAMIC THEME STYLING
+# 3. HELPER FUNCTIONS (Must be defined before logic runs)
 # --------------------------------------------------
 
-# Define Color Palettes
-light_theme = {
-    "bg_color": "#f1f0f6",
-    "text_color": "#2c3e50",
-    "card_bg": "#ffffff",
-    "card_shadow": "rgba(0,0,0,0.05)",
-    "table_row_hover": "#f8f9fa",
-    "secondary_btn_bg": "#ffffff",
-    "secondary_btn_text": "#6a11cb",
-    "game_bg": "#fcfcf4",
-    "game_grid": "#e0dacc"
-}
+# --- GOOGLE SHEETS ---
+def get_google_client():
+    scope = ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive']
+    creds = Credentials.from_service_account_info(st.secrets["gcp_service_account"], scopes=scope)
+    return gspread.authorize(creds)
 
-dark_theme = {
-    "bg_color": "#0e1117",
-    "text_color": "#e0e0e0",
-    "card_bg": "#1e1e1e",
-    "card_shadow": "rgba(0,0,0,0.5)",
-    "table_row_hover": "#2d2d2d",
-    "secondary_btn_bg": "#1e1e1e",
-    "secondary_btn_text": "#a18cd1",
-    "game_bg": "#1a1a1a",
-    "game_grid": "#333333"
-}
+def get_google_sheet(index=0):
+    client = get_google_client()
+    sheet_url = st.secrets["private_sheet_url"] 
+    try:
+        sh = client.open_by_url(sheet_url)
+        if index >= len(sh.worksheets()):
+            return sh.add_worksheet(title="Leaderboard", rows="1000", cols="4")
+        return sh.get_worksheet(index)
+    except Exception as e:
+        return None
 
-# Select current palette
-current_theme = light_theme if st.session_state.theme == 'light' else dark_theme
+def update_leaderboard_score(name, branch, score):
+    try:
+        sheet = get_google_sheet(1) # Sheet Index 1 for Leaderboard
+        # Check if headers exist
+        if not sheet.row_values(1):
+            sheet.append_row(["Branch", "Name", "Score", "Date"])
+        
+        # Log the new score
+        sheet.append_row([branch, name, score, str(date.today())])
+        return True, "Success"
+    except Exception as e:
+        return False, str(e)
 
-# Generate CSS
-st.markdown(f"""
-<style>
-@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap');
-
-/* --- CSS VARIABLES --- */
-:root {{
-    --bg-color: {current_theme['bg_color']};
-    --text-color: {current_theme['text_color']};
-    --card-bg: {current_theme['card_bg']};
-    --card-shadow: {current_theme['card_shadow']};
-    --table-row-hover: {current_theme['table_row_hover']};
-    --sec-btn-bg: {current_theme['secondary_btn_bg']};
-    --sec-btn-text: {current_theme['secondary_btn_text']};
-}}
-
-/* BACKGROUND & GLOBAL FONT */
-.stApp {{ background-color: var(--bg-color); }}
-
-html, body, [class*="css"], .stMarkdown, div, span, p, h1, h2, h3, h4, h5, h6 {{
-    font-family: 'Poppins', sans-serif;
-    color: var(--text-color);
-}}
-
-/* --- SIDEBAR TOGGLE BUTTON --- */
-.theme-btn {{
-    border: 1px solid var(--text-color);
-    background: transparent;
-    color: var(--text-color);
-    padding: 5px 10px;
-    border-radius: 15px;
-    cursor: pointer;
-    font-size: 12px;
-    margin-bottom: 10px;
-}}
-
-/* --- INPUT BOXES --- */
-div[data-baseweb="input"] {{
-    border: none;
-    border-radius: 50px !important;
-    background-color: #262730; 
-    padding: 8px 20px;
-    box-shadow: inset 0 2px 4px rgba(0,0,0,0.5);
-    color: white !important;
-}}
-div[data-baseweb="input"] input {{ color: white !important; caret-color: white; }}
-div[data-testid="stDateInput"] input {{ color: #ffffff !important; font-weight: 600; }}
-
-/* --- BUTTONS (UNIFORM SIZE CARD FIX - 2 COLUMN LAYOUT) --- */
-div.stButton > button {{
-    width: 100% !important;
-    height: 80px !important;        /* FIXED HEIGHT */
-    min-height: 80px !important;
-    white-space: normal !important; /* TEXT WRAPPING */
-    line-height: 1.2 !important;
-    padding: 8px !important;
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    border-radius: 15px !important;
-    font-size: 13px !important;     /* Readable font size */
-    text-align: center !important;
-}}
-
-div.stButton > button[kind="primary"] {{
-    background: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%) !important;
-    border: none !important; 
-    font-weight: 700 !important;
-    box-shadow: 0 4px 10px rgba(106, 17, 203, 0.2); 
-    transition: transform 0.2s;
-}}
-div.stButton > button[kind="primary"] * {{ color: #ffffff !important; }}
-div.stButton > button[kind="primary"]:hover {{ transform: translateY(-2px); box-shadow: 0 6px 15px rgba(106, 17, 203, 0.3); }}
-
-div.stButton > button[kind="secondary"] {{
-    background-color: var(--sec-btn-bg) !important; 
-    color: var(--sec-btn-text) !important; 
-    border: 2px solid #6a11cb !important; 
-    font-weight: 600 !important;
-}}
-div.stButton > button[kind="secondary"]:hover {{ background-color: var(--table-row-hover) !important; }}
-
-/* --- TIMETABLE GRID --- */
-.timetable-wrapper {{ overflow-x: auto; padding: 20px 5px 40px 5px; }}
-table.custom-grid {{ width: 100%; min-width: 1000px; border-collapse: separate; border-spacing: 10px; }}
-
-.custom-grid th {{
-    background: linear-gradient(90deg, #8EC5FC 0%, #E0C3FC 100%);
-    color: #2c3e50; font-weight: 800; padding: 15px; border-radius: 15px;
-    text-align: center; font-size: 18px; box-shadow: 0 4px 10px rgba(142, 197, 252, 0.4); border: none;
-    text-transform: uppercase; letter-spacing: 1px;
-}}
-.custom-grid th:first-child {{ background: transparent; box-shadow: none; width: 140px; color: var(--text-color); }}
-
-.custom-grid td:first-child {{
-    background: linear-gradient(90deg, #8EC5FC 0%, #E0C3FC 100%);
-    border-radius: 15px; font-size: 14px; font-weight: 800; color: #2c3e50;
-    text-align: center; vertical-align: middle; box-shadow: 0 4px 10px rgba(142, 197, 252, 0.4);
-    min-width: 140px; white-space: nowrap;
-}}
-.custom-grid td {{ vertical-align: top; height: 110px; padding: 0; border: none; }}
-.time-label {{ color: #2c3e50 !important; }}
-
-/* CARD & HOVER EFFECTS */
-.class-card {{
-    height: 100%; width: 100%; padding: 12px; box-sizing: border-box;
-    display: flex; flex-direction: column; justify-content: center;
-    border-radius: 18px; transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
-    position: relative; cursor: default;
-}}
-.class-card.filled {{
-    border: 1px solid rgba(255,255,255,0.4) !important;
-    box-shadow: 0 4px 6px rgba(0,0,0,0.05) !important;
-    color: #2c3e50 !important;
-}}
-.class-card.filled div, .class-card.filled span, .class-card.filled p {{
-    color: #2c3e50 !important; border: none !important; box-shadow: none !important;
-}}
-.class-card.filled:hover {{ transform: translateY(-5px) scale(1.03); box-shadow: 0 15px 30px rgba(0,0,0,0.15) !important; z-index: 100; }}
-.type-empty {{ background: var(--card-bg); border: 2px dashed rgba(160, 160, 200, 0.2); border-radius: 18px; }}
-.sub-title {{ font-weight: 700; font-size: 13px; margin-bottom: 4px; }}
-.sub-meta {{ font-size: 11px; opacity: 0.9; }}
-.batch-badge {{
-    background: rgba(255,255,255,0.6); padding: 3px 8px; border-radius: 10px;
-    font-size: 10px; font-weight: 700; text-transform: uppercase; display: inline-block;
-    margin-bottom: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); color: #2c3e50 !important;
-}}
-
-/* ATTENDANCE CARDS */
-.metric-card {{
-    background: var(--card-bg); border-radius: 20px; padding: 20px;
-    box-shadow: 0 4px 15px var(--card-shadow); text-align: center;
-    border: 1px solid rgba(128, 128, 128, 0.1); height: 100%; transition: transform 0.2s;
-}}
-.metric-card:hover {{ transform: translateY(-5px); }}
-.metric-value {{
-    font-size: 32px; font-weight: 800;
-    background: -webkit-linear-gradient(45deg, #6a11cb, #2575fc);
-    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-}}
-.metric-title {{ color: var(--text-color); font-weight: 600; }}
-.metric-sub {{ color: var(--text-color); opacity: 0.7; font-size: 12px; }}
-
-.daily-card {{
-    background: var(--card-bg); border-radius: 18px; padding: 20px; margin-bottom: 15px;
-    box-shadow: 0 4px 10px var(--card-shadow); display: flex; justify-content: space-between;
-    align-items: center; border-left: 6px solid #6a11cb;
-}}
-.daily-info h4 {{ color: var(--text-color); margin: 0; font-weight: 700; }}
-.daily-info p {{ color: var(--text-color); opacity: 0.8; margin: 0; font-size: 14px; }}
-
-.student-card {{ 
-    background: var(--card-bg); border-radius: 24px; padding: 30px; text-align: center; 
-    margin-bottom: 30px; box-shadow: 0 10px 25px rgba(106, 17, 203, 0.1); 
-}}
-.student-name {{ 
-    font-size: 28px; font-weight: 700; 
-    background: -webkit-linear-gradient(45deg, #6a11cb, #2575fc); 
-    -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 5px; 
-}}
-.student-meta {{ font-size: 15px; color: var(--text-color); opacity: 0.7; font-weight: 500; }}
-
-/* --- EXPANDER HEADER --- */
-[data-testid="stExpander"] summary p {{
-    background: -webkit-linear-gradient(45deg, #ff9a44, #fc6076);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    font-size: 18px !important;
-    font-weight: 800 !important;
-}}
-[data-testid="stExpander"] summary svg {{ fill: var(--text-color) !important; color: var(--text-color) !important; }}
-</style>
-""", unsafe_allow_html=True)
-
-# --------------------------------------------------
-# 4. HELPERS
-# --------------------------------------------------
-SUBJECT_GRADIENTS = [
-    "linear-gradient(135deg, #a18cd1 0%, #fbc2eb 100%)", "linear-gradient(135deg, #84fab0 0%, #8fd3f4 100%)",
-    "linear-gradient(135deg, #e0c3fc 0%, #8ec5fc 100%)", "linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%)",
-    "linear-gradient(135deg, #fccb90 0%, #d57eeb 100%)", "linear-gradient(135deg, #fa709a 0%, #fee140 100%)",
-    "linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)", "linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)"
-]
-
-def get_subject_gradient(subject_name):
-    if not subject_name: return SUBJECT_GRADIENTS[0]
-    idx = zlib.adler32(subject_name.encode('utf-8')) % len(SUBJECT_GRADIENTS)
-    return SUBJECT_GRADIENTS[idx]
-
-def correct_subject_name(text):
-    if pd.isna(text): return ""
-    return str(text).replace("Quantun Physics", "Quantum Physics")
-
+# --- TEXT HELPERS ---
 def clean_text(text): 
     if pd.isna(text): return ""
     return re.sub(r'[^a-z0-9]', '', str(text).lower())
@@ -272,6 +83,156 @@ def clean_mis(text):
     if pd.isna(text): return ""
     s = str(text).strip()
     return clean_text(s[:-2] if s.endswith(".0") else s)
+
+# --- DATA LOADING ---
+@st.cache_data
+def load_data():
+    if not os.path.exists(DATA_FOLDER): return [], None, {}
+    sub_dfs = []
+    sched_df = None
+    link_map = {} 
+    for f in os.listdir(DATA_FOLDER):
+        if not f.endswith(".xlsx"): continue
+        path = os.path.join(DATA_FOLDER, f)
+        try:
+            df = pd.read_excel(path)
+            df.columns = df.columns.astype(str).str.strip()
+            if f.lower() == TIMETABLE_FILE.lower():
+                sched_df = df
+            elif "link" in f.lower():
+                for _, row in df.iterrows():
+                    if len(row) >= 2:
+                        link_map[clean_text(str(row.iloc[0]))] = str(row.iloc[1]).strip()
+            else:
+                sub_dfs.append(df)
+        except: continue
+    return sub_dfs, sched_df, link_map
+
+def get_basic_user_info(mis, sub_dfs):
+    """Quick fetch for name/branch for the score handler"""
+    target_mis = clean_mis(mis)
+    for df in sub_dfs:
+        mis_col = next((c for c in df.columns if "MIS" in c.upper()), None)
+        if not mis_col: continue
+        df["_KEY"] = df[mis_col].apply(clean_mis)
+        match = df[df["_KEY"] == target_mis]
+        if not match.empty:
+            row = match.iloc[0]
+            name = row.get(next((c for c in df.columns if "Name" in c), ""), "Student")
+            branch = row.get(next((c for c in df.columns if "Branch" in c), ""), "General")
+            return name, branch
+    return "Unknown", "General"
+
+# --------------------------------------------------
+# 4. STEP 2: AUTO-SAVE SCORE HANDLER
+# --------------------------------------------------
+# This logic must run BEFORE the UI renders to process the URL params
+
+try:
+    # Check query params for 'score' and 'user'
+    qp = st.query_params
+    if "score" in qp and "user" in qp:
+        new_score_val = int(qp["score"])
+        user_check = qp["user"]
+        
+        # Security: Only save if logged-in user matches the score user
+        if str(user_check).strip() == str(st.session_state.mis_no).strip():
+            
+            # 1. Fetch User Details for the log
+            sub_dfs_temp, _, _ = load_data()
+            p_name, p_branch = get_basic_user_info(user_check, sub_dfs_temp)
+            
+            # 2. Save to Google Sheets (Background)
+            success, msg = update_leaderboard_score(p_name, p_branch, new_score_val)
+            
+            # 3. OPTIMISTIC UPDATE: Store in Session State immediately
+            # This ensures the Yellow Box updates even if the Sheet API is slow
+            st.session_state.latest_game_data = {
+                "Branch": p_branch,
+                "Name": p_name,
+                "Score": new_score_val
+            }
+            
+            # 4. Feedback
+            if success:
+                st.toast(f"✅ Score of {new_score_val} Saved!", icon="💾")
+                if new_score_val > 500: st.balloons()
+            else:
+                st.error(f"Cloud Save Failed: {msg}")
+        
+        # 5. Clear URL and Reload to remove params
+        time.sleep(1) # Brief pause to ensure toast is seen
+        st.query_params.clear()
+        st.rerun()
+
+except Exception as e:
+    pass # Fail silently on param errors to keep app running
+
+# --------------------------------------------------
+# 5. UI STYLING & REMAINING HELPERS
+# --------------------------------------------------
+
+def toggle_theme():
+    st.session_state.theme = 'dark' if st.session_state.theme == 'light' else 'light'
+
+# Define Color Palettes
+light_theme = {
+    "bg_color": "#f1f0f6", "text_color": "#2c3e50", "card_bg": "#ffffff",
+    "card_shadow": "rgba(0,0,0,0.05)", "table_row_hover": "#f8f9fa",
+    "secondary_btn_bg": "#ffffff", "secondary_btn_text": "#6a11cb",
+    "game_bg": "#fcfcf4", "game_grid": "#e0dacc"
+}
+dark_theme = {
+    "bg_color": "#0e1117", "text_color": "#e0e0e0", "card_bg": "#1e1e1e",
+    "card_shadow": "rgba(0,0,0,0.5)", "table_row_hover": "#2d2d2d",
+    "secondary_btn_bg": "#1e1e1e", "secondary_btn_text": "#a18cd1",
+    "game_bg": "#1a1a1a", "game_grid": "#333333"
+}
+current_theme = light_theme if st.session_state.theme == 'light' else dark_theme
+
+st.markdown(f"""
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap');
+:root {{
+    --bg-color: {current_theme['bg_color']}; --text-color: {current_theme['text_color']};
+    --card-bg: {current_theme['card_bg']}; --card-shadow: {current_theme['card_shadow']};
+    --table-row-hover: {current_theme['table_row_hover']};
+    --sec-btn-bg: {current_theme['secondary_btn_bg']}; --sec-btn-text: {current_theme['secondary_btn_text']};
+}}
+.stApp {{ background-color: var(--bg-color); }}
+html, body, [class*="css"], .stMarkdown, div, span, p, h1, h2, h3, h4, h5, h6 {{ font-family: 'Poppins', sans-serif; color: var(--text-color); }}
+.theme-btn {{ border: 1px solid var(--text-color); background: transparent; color: var(--text-color); padding: 5px 10px; border-radius: 15px; cursor: pointer; }}
+div[data-baseweb="input"] {{ border-radius: 50px !important; background-color: #262730; color: white !important; }}
+div.stButton > button {{ width: 100% !important; height: 80px !important; border-radius: 15px !important; }}
+div.stButton > button[kind="primary"] {{ background: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%) !important; border: none !important; color: white !important; }}
+div.stButton > button[kind="secondary"] {{ background-color: var(--sec-btn-bg) !important; color: var(--sec-btn-text) !important; border: 2px solid #6a11cb !important; }}
+.timetable-wrapper {{ overflow-x: auto; padding: 20px 5px 40px 5px; }}
+table.custom-grid {{ width: 100%; min-width: 1000px; border-collapse: separate; border-spacing: 10px; }}
+.custom-grid th {{ background: linear-gradient(90deg, #8EC5FC 0%, #E0C3FC 100%); color: #2c3e50; padding: 15px; border-radius: 15px; text-align: center; }}
+.class-card {{ height: 100%; width: 100%; padding: 12px; border-radius: 18px; display: flex; flex-direction: column; justify-content: center; }}
+.class-card.filled {{ border: 1px solid rgba(255,255,255,0.4); box-shadow: 0 4px 6px rgba(0,0,0,0.05); color: #2c3e50; }}
+.type-empty {{ background: var(--card-bg); border: 2px dashed rgba(160, 160, 200, 0.2); }}
+.metric-card {{ background: var(--card-bg); border-radius: 20px; padding: 20px; box-shadow: 0 4px 15px var(--card-shadow); text-align: center; }}
+.metric-value {{ font-size: 32px; font-weight: 800; background: -webkit-linear-gradient(45deg, #6a11cb, #2575fc); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }}
+.daily-card {{ background: var(--card-bg); border-radius: 18px; padding: 20px; margin-bottom: 15px; box-shadow: 0 4px 10px var(--card-shadow); display: flex; justify-content: space-between; align-items: center; }}
+.student-card {{ background: var(--card-bg); border-radius: 24px; padding: 30px; text-align: center; margin-bottom: 30px; box-shadow: 0 10px 25px rgba(106, 17, 203, 0.1); }}
+.student-name {{ font-size: 28px; font-weight: 700; background: -webkit-linear-gradient(45deg, #6a11cb, #2575fc); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }}
+</style>
+""", unsafe_allow_html=True)
+
+# Helper Functions
+SUBJECT_GRADIENTS = [
+    "linear-gradient(135deg, #a18cd1 0%, #fbc2eb 100%)", "linear-gradient(135deg, #84fab0 0%, #8fd3f4 100%)",
+    "linear-gradient(135deg, #e0c3fc 0%, #8ec5fc 100%)", "linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%)",
+    "linear-gradient(135deg, #fccb90 0%, #d57eeb 100%)", "linear-gradient(135deg, #fa709a 0%, #fee140 100%)"
+]
+def get_subject_gradient(subject_name):
+    if not subject_name: return SUBJECT_GRADIENTS[0]
+    idx = zlib.adler32(subject_name.encode('utf-8')) % len(SUBJECT_GRADIENTS)
+    return SUBJECT_GRADIENTS[idx]
+
+def correct_subject_name(text):
+    return str(text).replace("Quantun Physics", "Quantum Physics") if not pd.isna(text) else ""
 
 def normalize_division(text):
     if pd.isna(text): return ""
@@ -317,27 +278,9 @@ def map_to_slot(time_str, slots):
     except: pass
     return None
 
-# --- GOOGLE SHEETS PERSISTENCE ---
-def get_google_client():
-    scope = ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive']
-    creds = Credentials.from_service_account_info(st.secrets["gcp_service_account"], scopes=scope)
-    return gspread.authorize(creds)
-
-def get_google_sheet(index=0):
-    client = get_google_client()
-    sheet_url = st.secrets["private_sheet_url"] 
-    try:
-        sh = client.open_by_url(sheet_url)
-        # Check if index exists, if not create
-        if index >= len(sh.worksheets()):
-            return sh.add_worksheet(title="Leaderboard", rows="1000", cols="4")
-        return sh.get_worksheet(index)
-    except Exception as e:
-        return None
-
 def load_attendance():
     try:
-        sheet = get_google_sheet(0) # Sheet 1
+        sheet = get_google_sheet(0) 
         data = sheet.col_values(1)
         return {cls_id: True for cls_id in data if cls_id}
     except Exception as e:
@@ -345,116 +288,12 @@ def load_attendance():
 
 def update_attendance_in_sheet(cls_id, action):
     try:
-        sheet = get_google_sheet(0) # Sheet 1
-        if action == "add":
-            sheet.append_row([cls_id])
+        sheet = get_google_sheet(0)
+        if action == "add": sheet.append_row([cls_id])
         elif action == "remove":
             cell = sheet.find(cls_id)
-            if cell:
-                sheet.delete_rows(cell.row)
-    except Exception as e:
-        pass
-
-# --- LEADERBOARD FUNCTIONS ---
-def get_leaderboard_data():
-    """Fetches entire leaderboard for edge case analysis"""
-    try:
-        sheet = get_google_sheet(1)
-        data = sheet.get_all_records()
-        if not data: return pd.DataFrame()
-        df = pd.DataFrame(data)
-        # Type enforcement
-        if 'Score' in df.columns:
-            df['Score'] = pd.to_numeric(df['Score'], errors='coerce').fillna(0).astype(int)
-        return df
-    except:
-        return pd.DataFrame()
-
-def get_overall_highest(df):
-    if df.empty or 'Score' not in df.columns: return 0, "No Data", "General"
-    max_idx = df['Score'].idxmax()
-    row = df.loc[max_idx]
-    return row['Score'], row['Name'], row['Branch']
-
-def get_branch_highest(df, branch):
-    if df.empty or 'Branch' not in df.columns: return 0, "No Data"
-    filtered = df[df['Branch'] == branch]
-    if filtered.empty: return 0, "No Data"
-    max_idx = filtered['Score'].idxmax()
-    row = filtered.loc[max_idx]
-    return row['Score'], row['Name']
-
-def update_leaderboard_score(name, branch, score):
-    try:
-        sheet = get_google_sheet(1)
-        # Check if headers exist
-        if not sheet.row_values(1):
-            sheet.append_row(["Branch", "Name", "Score", "Date"])
-            
-        # Optimization: We append new high score. 
-        # The logic fetches all and finds MAX, so we don't need to search/update rows.
-        # This acts as a log of high scores.
-        sheet.append_row([branch, name, score, str(date.today())])
-        return True, "Success"
-    except Exception as e:
-        return False, str(e)
-
-# --- MASTER ICS GENERATION ---
-def generate_master_ics(weekly_schedule, semester_end_date):
-    day_map = { "Monday": "MO", "Tuesday": "TU", "Wednesday": "WE", "Thursday": "TH", "Friday": "FR", "Saturday": "SA", "Sunday": "SU" }
-    ics_lines = [ "BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//StudentPortal//MasterTimetable//EN", "CALSCALE:GREGORIAN", "METHOD:PUBLISH" ]
-    today = date.today()
-    days_list = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
-
-    for cls in weekly_schedule:
-        try:
-            target_day_name = cls['Day'] 
-            if target_day_name not in days_list: continue
-            target_idx = days_list.index(target_day_name)
-            current_idx = today.weekday()
-            days_ahead = target_idx - current_idx if target_idx >= current_idx else 7 - (current_idx - target_idx)
-            start_date = today + timedelta(days=days_ahead)
-            start_h, start_m = map(int, cls['StartTime'].split(':'))
-            dt_start = datetime.combine(start_date, datetime.min.time()).replace(hour=start_h, minute=start_m)
-            dt_end = dt_start + timedelta(hours=cls.get('Duration', 1))
-            fmt = "%Y%m%dT%H%M%S"
-            until_str = semester_end_date.strftime("%Y%m%dT235959")
-            rrule_day = day_map.get(target_day_name, "MO")
-            event_block = [
-                "BEGIN:VEVENT", f"SUMMARY:{cls['Subject']} ({cls['Type']})", f"DTSTART:{dt_start.strftime(fmt)}", f"DTEND:{dt_end.strftime(fmt)}",
-                f"RRULE:FREQ=WEEKLY;BYDAY={rrule_day};UNTIL={until_str}", f"LOCATION:{cls['Venue']}", f"DESCRIPTION:Weekly {cls['Type']} session.",
-                "BEGIN:VALARM", "TRIGGER:-PT15M", "ACTION:DISPLAY", "DESCRIPTION:Reminder", "END:VALARM", "END:VEVENT"
-            ]
-            ics_lines.extend(event_block)
-        except: continue
-    ics_lines.append("END:VCALENDAR")
-    return "\n".join(ics_lines)
-
-# --------------------------------------------------
-# 5. DATA LOADING & LOGIC
-# --------------------------------------------------
-@st.cache_data
-def load_data():
-    if not os.path.exists(DATA_FOLDER): return [], None, {}
-    sub_dfs = []
-    sched_df = None
-    link_map = {} 
-    for f in os.listdir(DATA_FOLDER):
-        if not f.endswith(".xlsx"): continue
-        path = os.path.join(DATA_FOLDER, f)
-        try:
-            df = pd.read_excel(path)
-            df.columns = df.columns.astype(str).str.strip()
-            if f.lower() == TIMETABLE_FILE.lower():
-                sched_df = df
-            elif "link" in f.lower():
-                for _, row in df.iterrows():
-                    if len(row) >= 2:
-                        link_map[clean_text(correct_subject_name(row.iloc[0]))] = str(row.iloc[1]).strip()
-            else:
-                sub_dfs.append(df)
-        except: continue
-    return sub_dfs, sched_df, link_map
+            if cell: sheet.delete_rows(cell.row)
+    except: pass
 
 def get_schedule(mis, sub_dfs, sched_df):
     found_subs = []
@@ -523,36 +362,25 @@ def render_grid(entries):
     html = '<div class="timetable-wrapper"><table class="custom-grid"><thead><tr><th>Time</th>' + ''.join([f'<th>{d}</th>' for d in days]) + '</tr></thead><tbody>'
     for s in slots:
         label = f"{s} - {str(int(s.split(':')[0])+1)}:{s.split(':')[1]}"
-        html += f'<tr><td class="time-label">{label}</td>'
+        html += f'<tr><td class="time-label" style="color:#2c3e50;">{label}</td>'
         for d in days:
             cell = grid[s][d]
             if cell == "MERGED": continue
             if cell:
                 span = f'rowspan="{cell["Duration"]}"' if cell['Duration'] > 1 else ''
                 grad = get_subject_gradient(cell['Subject'])
-                html += f'<td {span}><div class="class-card filled" style="background:{grad}"><div class="batch-badge">{cell["Type"]}</div><div class="sub-title">{cell["Subject"]}</div><div class="sub-meta">📍 {cell["Venue"]}</div></div></td>'
+                html += f'<td {span}><div class="class-card filled" style="background:{grad}"><div style="font-size:10px;font-weight:700;">{cell["Type"]}</div><div style="font-weight:700;">{cell["Subject"]}</div><div style="font-size:11px;">📍 {cell["Venue"]}</div></div></td>'
             else:
                 html += '<td><div class="class-card type-empty"></div></td>'
         html += '</tr>'
     return html + '</tbody></table></div>'
 
 def render_subject_html(subjects, link_map):
-    html_parts = ["""
-    <style>
-    .sub-alloc-wrapper { font-family: 'Poppins', sans-serif; margin-top: 10px; border-radius: 12px; overflow-x: auto; border: none; box-shadow: 0 4px 20px var(--card-shadow); background: var(--card-bg); }
-    table.sub-alloc-table { width: 100%; min-width: 600px; border-collapse: collapse; background: var(--card-bg); }
-    .sub-alloc-table thead th { background: linear-gradient(90deg, #a18cd1 0%, #fbc2eb 100%); color: white; padding: 18px; font-size: 17px; font-weight: 700; text-align: left; white-space: nowrap; }
-    .sub-alloc-table tbody td { padding: 16px; font-size: 16px; color: var(--text-color); border-bottom: 1px solid rgba(128,128,128,0.1); background: var(--card-bg); vertical-align: middle; transition: all 0.2s; white-space: nowrap; }
-    .sub-alloc-table tbody tr:hover td { background-color: var(--table-row-hover); transform: scale(1.005); color: #6a11cb; cursor: default; }
-    .drive-btn { background: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%); color: white !important; padding: 8px 16px; border-radius: 50px; text-decoration: none; font-size: 13px; font-weight: 600; display: inline-block; transition: 0.2s; }
-    .drive-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 15px rgba(37, 117, 252, 0.3); }
-    </style>
-    <div class="sub-alloc-wrapper"><table class="sub-alloc-table"><thead><tr><th style="width:40%">Subject Name</th><th style="width:20%">Batch</th><th style="width:20%">Division</th><th style="width:20%">Material</th></tr></thead><tbody>
-    """]
+    html_parts = ['<div style="margin-top:10px; overflow-x:auto;"><table style="width:100%; border-collapse:collapse; background:var(--card-bg);"><thead><tr><th style="padding:15px;background:#a18cd1;color:white;">Subject Name</th><th>Batch</th><th>Division</th><th>Material</th></tr></thead><tbody>']
     for sub in subjects:
         link = link_map.get(clean_text(sub.get('Subject')), "#")
-        link_html = f'<a href="{link}" target="_blank" class="drive-btn">📂 Open Drive</a>' if link != "#" else "<span style='color:#aaa'>No Link</span>"
-        html_parts.append(f"<tr><td>{sub.get('Subject')}</td><td>{sub.get('Batch')}</td><td>{sub.get('Division')}</td><td>{link_html}</td></tr>")
+        link_html = f'<a href="{link}" target="_blank" style="color:#6a11cb;font-weight:bold;">📂 Drive</a>' if link != "#" else "<span style='color:#aaa'>No Link</span>"
+        html_parts.append(f"<tr style='border-bottom:1px solid #eee;'><td style='padding:15px;color:var(--text-color);'>{sub.get('Subject')}</td><td style='color:var(--text-color);'>{sub.get('Batch')}</td><td style='color:var(--text-color);'>{sub.get('Division')}</td><td>{link_html}</td></tr>")
     html_parts.append("</tbody></table></div>")
     return "".join(html_parts)
 
@@ -563,8 +391,7 @@ def calculate_semester_totals(timetable_entries):
         d = entry['Day']
         if d not in weekly_map: weekly_map[d] = []
         weekly_map[d].append(entry)
-        key = f"{entry['Subject']}|{entry['Type']}"
-        totals[key] = 0
+        totals[f"{entry['Subject']}|{entry['Type']}"] = 0
     curr_date = SEMESTER_START
     while curr_date <= SEMESTER_END:
         day_name = curr_date.strftime("%A")
@@ -574,16 +401,66 @@ def calculate_semester_totals(timetable_entries):
         curr_date += timedelta(days=1)
     return totals
 
-# --------------------------------------------------
-# 6. GAME INTEGRATION (AUTOMATIC SCORE)
-# --------------------------------------------------
+def generate_master_ics(weekly_schedule, semester_end_date):
+    day_map = { "Monday": "MO", "Tuesday": "TU", "Wednesday": "WE", "Thursday": "TH", "Friday": "FR", "Saturday": "SA", "Sunday": "SU" }
+    ics_lines = [ "BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//StudentPortal//MasterTimetable//EN", "CALSCALE:GREGORIAN", "METHOD:PUBLISH" ]
+    today = date.today()
+    days_list = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+    for cls in weekly_schedule:
+        try:
+            target_day_name = cls['Day'] 
+            if target_day_name not in days_list: continue
+            target_idx = days_list.index(target_day_name)
+            current_idx = today.weekday()
+            days_ahead = target_idx - current_idx if target_idx >= current_idx else 7 - (current_idx - target_idx)
+            start_date = today + timedelta(days=days_ahead)
+            start_h, start_m = map(int, cls['StartTime'].split(':'))
+            dt_start = datetime.combine(start_date, datetime.min.time()).replace(hour=start_h, minute=start_m)
+            dt_end = dt_start + timedelta(hours=cls.get('Duration', 1))
+            fmt = "%Y%m%dT%H%M%S"
+            until_str = semester_end_date.strftime("%Y%m%dT235959")
+            rrule_day = day_map.get(target_day_name, "MO")
+            event_block = [
+                "BEGIN:VEVENT", f"SUMMARY:{cls['Subject']} ({cls['Type']})", f"DTSTART:{dt_start.strftime(fmt)}", f"DTEND:{dt_end.strftime(fmt)}",
+                f"RRULE:FREQ=WEEKLY;BYDAY={rrule_day};UNTIL={until_str}", f"LOCATION:{cls['Venue']}", "END:VEVENT"
+            ]
+            ics_lines.extend(event_block)
+        except: continue
+    ics_lines.append("END:VCALENDAR")
+    return "\n".join(ics_lines)
 
+# --- LEADERBOARD HELPERS ---
+def get_leaderboard_data():
+    try:
+        sheet = get_google_sheet(1)
+        data = sheet.get_all_records()
+        if not data: return pd.DataFrame()
+        df = pd.DataFrame(data)
+        if 'Score' in df.columns:
+            df['Score'] = pd.to_numeric(df['Score'], errors='coerce').fillna(0).astype(int)
+        return df
+    except: return pd.DataFrame()
+
+def get_overall_highest(df):
+    if df.empty or 'Score' not in df.columns: return 0, "No Data", "General"
+    max_idx = df['Score'].idxmax()
+    row = df.loc[max_idx]
+    return row['Score'], row['Name'], row['Branch']
+
+def get_branch_highest(df, branch):
+    if df.empty or 'Branch' not in df.columns: return 0, "No Data"
+    filtered = df[df['Branch'] == branch]
+    if filtered.empty: return 0, "No Data"
+    max_idx = filtered['Score'].idxmax()
+    row = filtered.loc[max_idx]
+    return row['Score'], row['Name']
+
+# --------------------------------------------------
+# 6. STEP 1: GAME RENDERER (WITH JS COMMUNICATION FIX)
+# --------------------------------------------------
 def render_game_html(mis_user):
-    # Detect theme colors for game CSS
-    bg_color = current_theme['game_grid'] 
     game_bg = "#fcfcf4"
     grid_line = "#e0dacc"
-    
     return f"""
 <!DOCTYPE html>
 <html lang="en">
@@ -593,83 +470,21 @@ def render_game_html(mis_user):
     <link href="https://fonts.googleapis.com/css2?family=Patrick+Hand&display=swap" rel="stylesheet">
     <style>
         * {{ box-sizing: border-box; -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }}
-        
-        body {{ 
-            margin: 0; padding: 0; 
-            display: flex; justify-content: center; align-items: center; 
-            height: 100vh;
-            background-color: transparent; 
-            font-family: 'Patrick Hand', cursive; 
-            overflow: hidden;
-        }}
-
-        #game-container {{
-            position: relative; 
-            width: 100%; max-width: 400px;
-            aspect-ratio: 2/3; max-height: 90vh;
-            background-color: {game_bg};
-            background-image: linear-gradient({grid_line} 1px, transparent 1px), linear-gradient(90deg, {grid_line} 1px, transparent 1px);
-            background-size: 15px 15px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.15); 
-            border-radius: 12px;
-            overflow: hidden;
-            touch-action: none; 
-        }}
-
-        canvas {{ 
-            display: block; 
-            width: 100%; height: 100%; 
-            position: absolute; top: 0; left: 0; 
-            
-            /* FIX 1: Canvas is now ABOVE the UI layer */
-            z-index: 20; 
-            
-            /* FIX 2: Initially let clicks pass through to the 'Play' button */
-            pointer-events: none; 
-            
-            touch-action: none;
-        }}
-
-        #ui-layer {{ 
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
-            
-            /* FIX 1: UI is now BELOW the canvas */
-            z-index: 10; 
-            
-            pointer-events: none; 
-        }}
-
-        /* Make sure interactive elements inside UI are clickable */
-        .menu-screen {{ pointer-events: auto; }}
-        
+        body {{ margin: 0; padding: 0; display: flex; justify-content: center; align-items: center; height: 100vh; background-color: transparent; font-family: 'Patrick Hand', cursive; overflow: hidden; }}
+        #game-container {{ position: relative; width: 100%; max-width: 400px; aspect-ratio: 2/3; max-height: 90vh; background-color: {game_bg}; background-image: linear-gradient({grid_line} 1px, transparent 1px), linear-gradient(90deg, {grid_line} 1px, transparent 1px); background-size: 15px 15px; box-shadow: 0 4px 20px rgba(0,0,0,0.15); border-radius: 12px; overflow: hidden; touch-action: none; }}
+        canvas {{ display: block; width: 100%; height: 100%; position: absolute; top: 0; left: 0; z-index: 20; pointer-events: none; touch-action: none; }}
+        #ui-layer {{ position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; pointer-events: none; }}
+        .menu-screen {{ pointer-events: auto; position: absolute; width: 100%; height: 100%; background: rgba(255,255,255, 0.95); display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; }}
         #score-display {{ position: absolute; top: 10px; left: 20px; font-size: 32px; color: #888; font-weight: bold; transition: opacity 0.3s; }}
-        
-        .menu-screen {{ 
-            position: absolute; width: 100%; height: 100%; 
-            background: rgba(255,255,255, 0.95); 
-            display: flex; flex-direction: column; justify-content: center; align-items: center; 
-            text-align: center; 
-        }}
-        
         #start-screen {{ top: 0; left: 0; transition: opacity 0.3s; }}
         #game-over-screen {{ left: 0; top: 100%; transition: top 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275); }}
         #game-over-screen.slide-up {{ top: 0% !important; }}
-        
         .hidden {{ display: none !important; opacity: 0; }}
         .fade-out {{ opacity: 0; }}
-        
         h1 {{ font-size: 42px; color: #d32f2f; margin: 0 0 10px 0; transform: rotate(-3deg); }}
         p {{ font-size: 20px; color: #444; margin: 5px 0; }}
-        
-        .btn {{ 
-            background: #fff; border: 2px solid #333; border-radius: 8px; 
-            padding: 12px 35px; font-family: 'Patrick Hand', cursive; font-size: 24px; 
-            color: #333; cursor: pointer; margin-top: 25px; 
-            box-shadow: 4px 4px 0px rgba(0,0,0,0.1); 
-            -webkit-tap-highlight-color: transparent;
-        }}
+        .btn {{ background: #fff; border: 2px solid #333; border-radius: 8px; padding: 12px 35px; font-family: 'Patrick Hand', cursive; font-size: 24px; color: #333; cursor: pointer; margin-top: 25px; box-shadow: 4px 4px 0px rgba(0,0,0,0.1); -webkit-tap-highlight-color: transparent; }}
         .btn:active {{ transform: scale(0.96); box-shadow: 2px 2px 0px rgba(0,0,0,0.1); background: #f4f4f4; }}
-
         .auto-save-msg {{ font-size:16px; color:#6a11cb; margin-top:15px; font-weight:bold; }}
     </style>
 </head>
@@ -678,13 +493,10 @@ def render_game_html(mis_user):
     <canvas id="gameCanvas" width="400" height="600"></canvas>
     <div id="ui-layer">
         <div id="score-display">0</div>
-        
         <div id="start-screen" class="menu-screen">
-            <h1>Doodle Jump</h1>
-            <p>Tap <b>Left</b> or <b>Right</b> side</p>
+            <h1>Doodle Jump</h1><p>Tap <b>Left</b> or <b>Right</b> side</p>
             <button class="btn" onclick="startGame()">Play Now</button>
         </div>
-        
         <div id="game-over-screen" class="menu-screen">
             <h1>Game Over!</h1>
             <p>Score: <span id="final-score">0</span></p>
@@ -697,24 +509,20 @@ def render_game_html(mis_user):
 <script>
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
-    
     const GRAVITY = 0.375; const JUMP_FORCE = -13.81; const MOVE_SPEED = 8.12;
     const GAME_W = 400; const GAME_H = 600;
     const USER_MIS = "{mis_user}";
-    
     let platforms = [], brokenParts = [], score = 0;
     let highScore = localStorage.getItem('doodleHighScore') || 0;
     let gameRunning = false, isGameOverAnimating = false;
     const doodler = {{ x: GAME_W / 2 - 20, y: GAME_H - 150, w: 60, h: 60, vx: 0, vy: 0, dir: 1 }};
     const keys = {{ left: false, right: false }};
     
-    // --- CONTROLS ---
+    // CONTROLS
     window.addEventListener('keydown', e => {{ if(e.key==="ArrowLeft") keys.left=true; if(e.key==="ArrowRight") keys.right=true; }});
     window.addEventListener('keyup', e => {{ if(e.key==="ArrowLeft") keys.left=false; if(e.key==="ArrowRight") keys.right=false; }});
-
     canvas.addEventListener('touchmove', function(e) {{ e.preventDefault(); }}, {{ passive: false }});
     canvas.addEventListener('touchstart', function(e) {{ e.preventDefault(); }}, {{ passive: false }});
-
     const handleTouch = (e) => {{
         if(e.touches.length === 0) return;
         const touch = e.touches[0];
@@ -724,7 +532,6 @@ def render_game_html(mis_user):
         if (touchX < middle) {{ keys.left = true; keys.right = false; }} 
         else {{ keys.left = false; keys.right = true; }}
     }};
-
     canvas.addEventListener('touchstart', handleTouch, {{ passive: false }});
     canvas.addEventListener('touchmove', handleTouch, {{ passive: false }});
     canvas.addEventListener('touchend', e => {{ e.preventDefault(); keys.left = false; keys.right = false; }});
@@ -736,9 +543,7 @@ def render_game_html(mis_user):
         let currentY = startY;
         while (currentY > 0) {{ currentY -= 50; generatePlatform(currentY, true); }}
     }}
-    function createPlatform(x, y, type) {{
-        return {{ x, y, w: 60, h: 15, type: type, hasSpring: (type==='standard' && Math.random()<0.05), springAnim: 0 }};
-    }}
+    function createPlatform(x, y, type) {{ return {{ x, y, w: 60, h: 15, type: type, hasSpring: (type==='standard' && Math.random()<0.05), springAnim: 0 }}; }}
     function generatePlatform(y, forceSafe=false) {{
         let type = 'standard';
         if (platforms.length > 0 && platforms[platforms.length-1].type==='breakable') forceSafe=true;
@@ -757,7 +562,6 @@ def render_game_html(mis_user):
         if (doodler.x < -doodler.w/2) doodler.x = GAME_W - doodler.w/2;
         else if (doodler.x > GAME_W - doodler.w/2) doodler.x = -doodler.w/2;
         doodler.vy += GRAVITY; doodler.y += doodler.vy;
-        
         let centerX = doodler.x + doodler.w/2; let feetY = doodler.y + doodler.h;
         if (doodler.vy > 0) {{
             platforms.forEach((p, index) => {{
@@ -783,35 +587,27 @@ def render_game_html(mis_user):
         brokenParts.push({{ x: p.x + p.w/2, y: p.y, w: p.w/2, h: p.h, vy: -1, rot: 0, type: 'right' }});
     }}
     
+    // --- THIS FUNCTION TRIGGERS THE PYTHON REFRESH (UPDATED STEP 1) ---
     function triggerGameOverSequence() {{
         if (isGameOverAnimating) return; isGameOverAnimating = true;
         if(score > highScore) {{ highScore = score; localStorage.setItem('doodleHighScore', highScore); }}
-        
         document.getElementById('final-score').innerText = score;
         document.getElementById('high-score').innerText = highScore;
         
-        // FIX 3: Disable pointer events on canvas so user can click 'Play Again' behind it
-        canvas.style.pointerEvents = 'none';
-
+        canvas.style.pointerEvents = 'none'; // Disable canvas clicks
         platforms = []; brokenParts = []; doodler.y = -70; doodler.vy = 0;
+        
         const goScreen = document.getElementById('game-over-screen');
         goScreen.classList.remove('hidden'); void goScreen.offsetWidth; goScreen.classList.add('slide-up');
         document.getElementById('score-display').classList.add('fade-out');
 
-        let baseUrl = "";
-        try {{ baseUrl = document.referrer || window.parent.location.href; }} catch(e) {{ }}
-        
-        if (baseUrl) {{
-            try {{
-                const url = new URL(baseUrl);
-                url.searchParams.set('score', score);
-                url.searchParams.set('user', USER_MIS);
-                
-                // AUTOMATICALLY REDIRECT TO SAVE SCORE (NO BUTTON CLICK NEEDED)
-                window.top.location.href = url.toString();
-                
-            }} catch(e) {{ }}
-        }}
+        try {{
+            // Construct new URL with score param to force reload and save
+            const currentUrl = new URL(window.parent.location.href);
+            currentUrl.searchParams.set('score', score);
+            currentUrl.searchParams.set('user', USER_MIS);
+            window.parent.location.href = currentUrl.toString();
+        }} catch(e) {{ console.log(e); }}
     }}
 
     function drawScribbleFill(x, y, w, h, color) {{
@@ -866,10 +662,7 @@ def render_game_html(mis_user):
         const goScreen = document.getElementById('game-over-screen'); goScreen.classList.remove('slide-up');
         document.getElementById('score-display').classList.remove('fade-out');
         document.getElementById('auto-msg').style.display = 'block';
-        
-        // FIX 4: Enable canvas pointer events so user can tap to move
-        canvas.style.pointerEvents = 'auto';
-        
+        canvas.style.pointerEvents = 'auto'; // Re-enable clicks
         isGameOverAnimating = false; init();
         if (!gameRunning) {{ gameRunning = true; requestAnimationFrame(loop); }}
     }}
@@ -880,96 +673,22 @@ def render_game_html(mis_user):
 """
 
 # --------------------------------------------------
-# 7. MAIN APPLICATION
+# 7. MAIN APPLICATION LOGIC
 # --------------------------------------------------
 
-# Ensure score processing happens FIRST
-if 'mis_no' not in st.session_state:
-    st.session_state.mis_no = ""
-if 'attendance' not in st.session_state:
-    st.session_state.attendance = load_attendance()
-
-# -------------------------------------------------------
-# AUTO-SAVE SCORE HANDLER (OPTIMISTIC UPDATE)
-# -------------------------------------------------------
-try:
-    # Retrieve Params (Streamlit > 1.30 syntax)
-    qp = st.query_params
-    new_score_str = qp.get("score")
-    user_check = qp.get("user")
-    
-    if new_score_str and user_check:
-        # Check against session state MIS for security
-        if str(user_check).strip() == str(st.session_state.mis_no).strip():
-            current_score = int(new_score_str)
-            
-            # 1. Fetch User Info & Current Leaderboard
-            sub_dfs, sched_df, link_map = load_data()
-            _, _, name, branch = get_schedule(st.session_state.mis_no, sub_dfs, sched_df)
-            full_leaderboard_df = get_leaderboard_data()
-            
-            # 2. Get Current High Scores (Before update)
-            overall_high, _, _ = get_overall_highest(full_leaderboard_df)
-            branch_high, _ = get_branch_highest(full_leaderboard_df, branch)
-            
-            # 3. Save Score to Sheet (Log it)
-            success, msg = update_leaderboard_score(name, branch, current_score)
-            
-            if success:
-                # 4. OPTIMISTIC UPDATE: Store in Session State
-                # This ensures the Yellow Box updates even if the Sheet API is slow
-                st.session_state.latest_game_data = {
-                    "Branch": branch,
-                    "Name": name,
-                    "Score": current_score
-                }
-
-                # 5. Feedback Messages & Celebrations
-                if current_score > overall_high:
-                    st.toast(f"👑 NEW COLLEGE RECORD! {current_score}", icon="🏆")
-                    st.balloons()
-                elif current_score > branch_high:
-                    st.toast(f"🥇 NEW {branch} RECORD! {current_score}", icon="🔥")
-                    st.snow()
-                else:
-                    st.toast(f"Score saved: {current_score}", icon="✅")
-            else:
-                st.error(f"Failed to save score: {msg}")
-
-        else:
-            st.error(f"Security Warning: Score mismatch. Logged in as {st.session_state.mis_no}, but score received for {user_check}.")
-        
-        # 6. Clear URL Params
-        st.query_params.clear()
-        # Rerun to refresh the UI with new data
-        time.sleep(0.5) 
-        st.rerun()
-        
-except Exception as e:
-    pass
-
+# Header
+if 'attendance' not in st.session_state: st.session_state.attendance = load_attendance()
 sub_dfs, sched_df, link_map = load_data()
 
-# HEADER with Theme Toggle
 h1_col, toggle_col = st.columns([8, 1])
-with h1_col:
-    header_html = """
-    <h1 style='text-align: left; background: linear-gradient(to right, #6a11cb, #2575fc); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-size: 3em; font-weight: 800; padding-top:10px;'>
-    ✨ Smart Semester Timetable
-    </h1>
-    """
-    st.markdown(header_html, unsafe_allow_html=True)
-
-with toggle_col:
-    st.write("") 
-    st.write("") 
-    icon = "🌙" if st.session_state.theme == "light" else "☀️"
-    if st.button(icon, on_click=toggle_theme, key="theme_toggle", help="Toggle Dark Mode"): pass
+with h1_col: st.markdown("<h1 style='text-align:left;background:linear-gradient(to right,#6a11cb,#2575fc);-webkit-background-clip:text;-webkit-text-fill-color:transparent;'>✨ Smart Semester Timetable</h1>", unsafe_allow_html=True)
+with toggle_col: 
+    if st.button("🌙" if st.session_state.theme == "light" else "☀️", on_click=toggle_theme): pass
 
 if not sub_dfs or sched_df is None:
     st.error(f"Missing files in '{DATA_FOLDER}'.")
 else:
-    # INPUT SECTION
+    # Login Section
     if not st.session_state.mis_no:
         mis_input = st.text_input("Enter MIS No:", placeholder="e.g. 612572034")
         if mis_input:
@@ -979,204 +698,121 @@ else:
         mis = st.session_state.mis_no
         c1, c2 = st.columns([9, 1])
         with c2: 
-            if st.button("Change User", type="secondary"):
+            if st.button("Exit", type="secondary"): 
                 st.session_state.mis_no = ""
                 st.rerun()
 
         subs, table, name, branch = get_schedule(mis, sub_dfs, sched_df)
 
         if subs:
-            # --- PROFILE ---
+            # Profile & Timetable
             st.markdown(f"""<div class="student-card"><div class="student-name">{name}</div><div class="student-meta">{branch} • MIS: {mis}</div></div>""", unsafe_allow_html=True)
-
-            # --- 1. WEEKLY SCHEDULE ---
-            st.markdown("""<h3 style="font-size: 28px; font-weight: 700; margin: 20px 0; background: linear-gradient(to right, #6a11cb, #fbc2eb); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">🗓️ Weekly Schedule</h3>""", unsafe_allow_html=True)
-            
+            st.markdown("### 🗓️ Weekly Schedule")
             if table:
                 st.sidebar.markdown("---")
-                st.sidebar.markdown(f"""<h3 style='background: linear-gradient(45deg, #a18cd1, #fbc2eb); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-weight: 700; margin-bottom: 5px;'>📲 Calendar Sync</h3><p style='font-size: 11px; color: var(--text-color); margin-bottom: 10px;'>One click to add your entire semester schedule to your phone.</p>""", unsafe_allow_html=True)
+                st.sidebar.markdown("### 📲 Calendar Sync")
                 master_ics_data = generate_master_ics(table, SEMESTER_END)
-                st.sidebar.download_button(label="📥 Sync Full Semester", data=master_ics_data, file_name=f"My_Semester_Timetable_{mis}.ics", mime="text/calendar")
+                st.sidebar.download_button("📥 Sync Full Semester", master_ics_data, f"My_Timetable_{mis}.ics", "text/calendar")
                 st.markdown(render_grid(table), unsafe_allow_html=True)
-            else:
-                st.warning("No schedule found.")
+            else: st.warning("No schedule found.")
 
-            # --- ALLOCATED SUBJECTS ---
-            with st.expander("Subject Allocation List", expanded=False):
-                st.markdown(render_subject_html(subs, link_map), unsafe_allow_html=True)
-            
-            # --- 2. ATTENDANCE TRACKER ---
-            st.markdown("""<hr style="border:1px solid rgba(128,128,128,0.2); margin: 40px 0;">""", unsafe_allow_html=True)
-            st.markdown("""<h3 style="font-size: 28px; font-weight: 700; margin-bottom: 20px; background: linear-gradient(to right, #6a11cb, #fbc2eb); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">✅ Attendance Tracker</h3>""", unsafe_allow_html=True)
+            with st.expander("Subject Allocation List"): st.markdown(render_subject_html(subs, link_map), unsafe_allow_html=True)
 
-            col_date, col_daily_list = st.columns([1, 3])
+            # Attendance
+            st.markdown("<hr style='margin:40px 0;opacity:0.2;'>", unsafe_allow_html=True)
+            st.markdown("### ✅ Attendance Tracker")
+            col_date, col_daily = st.columns([1, 3])
             with col_date:
-                st.markdown("##### Select Date")
-                selected_date = st.date_input("Pick a day", value=date.today(), min_value=SEMESTER_START, max_value=SEMESTER_END)
+                selected_date = st.date_input("Pick a day", date.today(), min_value=SEMESTER_START, max_value=SEMESTER_END)
                 day_name = selected_date.strftime("%A")
-                st.caption(f"Schedule for **{day_name}**")
-
-            with col_daily_list:
-                st.markdown(f"##### Schedule for {selected_date.strftime('%d %B, %Y')}")
-                daily_classes = [t for t in table if t['Day'] == day_name]
-                
-                if not daily_classes:
-                    st.info("😴 No classes scheduled for this day.")
+            with col_daily:
+                daily = [t for t in table if t['Day'] == day_name]
+                if not daily: st.info("No classes today.")
                 else:
-                    daily_classes.sort(key=lambda x: datetime.strptime(x['StartTime'], "%H:%M"))
-                    for i, cls in enumerate(daily_classes):
-                        cls_id = f"{mis}_{selected_date}_{cls['Subject']}_{cls['Type']}_{cls['StartTime']}"
-                        is_present = st.session_state.attendance.get(cls_id, False)
-                        border_color = "#6a11cb" if is_present else "rgba(128,128,128,0.2)"
-                        c_info, c_action = st.columns([4, 1])
-                        with c_info:
-                            st.markdown(f"""<div class="daily-card" style="border-left: 5px solid {border_color};"><div class="daily-info"><h4>{cls['Subject']}</h4><p>⏰ {cls['StartTime']} • {cls['Type']} • 📍 {cls['Venue']}</p></div></div>""", unsafe_allow_html=True)
-                        with c_action:
-                            btn_label = "Mark ✓" if not is_present else "Undo ✕"
-                            btn_type = "primary" if not is_present else "secondary"
-                            if st.button(btn_label, key=cls_id, type=btn_type, use_container_width=True):
-                                if is_present:
-                                    del st.session_state.attendance[cls_id]
-                                    update_attendance_in_sheet(cls_id, "remove")
-                                else:
-                                    st.session_state.attendance[cls_id] = True
-                                    update_attendance_in_sheet(cls_id, "add")
+                    daily.sort(key=lambda x: datetime.strptime(x['StartTime'], "%H:%M"))
+                    for cls in daily:
+                        cid = f"{mis}_{selected_date}_{cls['Subject']}_{cls['Type']}_{cls['StartTime']}"
+                        is_present = st.session_state.attendance.get(cid, False)
+                        b_col = "#6a11cb" if is_present else "rgba(128,128,128,0.2)"
+                        c_info, c_act = st.columns([4, 1])
+                        with c_info: st.markdown(f"""<div class="daily-card" style="border-left:5px solid {b_col};"><div class="daily-info"><h4>{cls['Subject']}</h4><p>{cls['StartTime']} • {cls['Type']} • {cls['Venue']}</p></div></div>""", unsafe_allow_html=True)
+                        with c_act:
+                            if st.button("Mark ✓" if not is_present else "Undo ✕", key=cid, type="primary" if not is_present else "secondary"):
+                                if is_present: 
+                                    del st.session_state.attendance[cid]
+                                    update_attendance_in_sheet(cid, "remove")
+                                else: 
+                                    st.session_state.attendance[cid] = True
+                                    update_attendance_in_sheet(cid, "add")
                                 st.rerun()
-
-            # --- 3. CALCULATOR ---
-            st.markdown("""<hr style="border:1px solid rgba(128,128,128,0.2); margin: 40px 0;">""", unsafe_allow_html=True)
-            st.markdown("""<h3 style="font-size: 28px; font-weight: 700; margin-bottom: 20px; background: linear-gradient(to right, #6a11cb, #fbc2eb); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">📊 Attendance Calculator</h3>""", unsafe_allow_html=True)
             
+            # Calculator
+            st.markdown("<hr style='margin:40px 0;opacity:0.2;'>", unsafe_allow_html=True)
+            st.markdown("### 📊 Attendance Calculator")
             total_possible = calculate_semester_totals(table)
-            row_cols = st.columns(3)
-            col_idx = 0
-            
-            for sub_key, total_count in total_possible.items():
-                subject_name, subject_type = sub_key.split('|')
-                attended = 0
-                for att_id in st.session_state.attendance:
-                    parts = att_id.split('_')
-                    if len(parts) >= 5 and parts[0] == mis and parts[2] == subject_name and parts[3] == subject_type:
-                        attended += 1
-                
-                percentage = (attended / total_count * 100) if total_count > 0 else 0
-                req_for_75 = (0.75 * total_count)
-                needed = req_for_75 - attended
-                border_grad = "linear-gradient(135deg, #6a11cb, #2575fc)"
-                is_dark = st.session_state.theme == 'dark'
-                bg_color = "rgba(106, 17, 203, 0.05)" if is_dark else "#f0f0f0"
-                msg_color = "#2ecc71"
+            r_cols = st.columns(3)
+            idx = 0
+            for sub_key, tot in total_possible.items():
+                s_name, s_type = sub_key.split('|')
+                att = 0
+                for aid in st.session_state.attendance:
+                    p = aid.split('_')
+                    if len(p)>=5 and p[0]==mis and p[2]==s_name and p[3]==s_type: att += 1
+                perc = (att/tot*100) if tot>0 else 0
+                needed = (0.75 * tot) - att
+                bg = "rgba(106,17,203,0.05)" if perc >= 75 else ("rgba(255,165,0,0.05)" if perc >= 60 else "rgba(255,0,0,0.05)")
+                with r_cols[idx%3]:
+                    st.markdown(f"""<div class="metric-card" style="background:{bg};"><div class="metric-title">{s_name}<br><span style="font-size:10px;">({s_type})</span></div><div class="metric-value">{perc:.1f}%</div><div class="metric-sub">{att}/{tot}</div></div>""", unsafe_allow_html=True)
+                    if needed > 0: st.markdown(f"<div style='text-align:center;color:#e74c3c;font-size:13px;font-weight:bold;'>Need {int(needed)+1} more</div>", unsafe_allow_html=True)
+                idx+=1
 
-                if percentage < 60:
-                    border_grad = "linear-gradient(135deg, #ff9a9e, #fecfef)" 
-                    bg_color = "rgba(255, 0, 0, 0.05)" if is_dark else "#fff5f5"
-                    msg_color = "#e74c3c"
-                elif percentage < 75:
-                    border_grad = "linear-gradient(135deg, #f6d365, #fda085)"
-                    bg_color = "rgba(255, 165, 0, 0.05)" if is_dark else "#fffdf5"
-                    msg_color = "#e67e22"
-
-                with row_cols[col_idx % 3]:
-                    st.markdown(f"""<div class="metric-card" style="border-top: 5px solid transparent; border-image: {border_grad} 1; background-color: {bg_color};"><div class="metric-title">{subject_name} <br> <span style="font-size:10px; opacity:0.7">({subject_type})</span></div><div class="metric-value">{percentage:.1f}%</div><div class="metric-sub">{attended} / {total_count} Sessions</div></div>""", unsafe_allow_html=True)
-                    if needed > 0: st.markdown(f"<div style='text-align:center; margin-top:10px; color:{msg_color}; font-weight:600; font-size:14px;'>Attend {int(needed) + 1} more</div>", unsafe_allow_html=True)
-                    else: st.markdown(f"<div style='text-align:center; margin-top:10px; color:{msg_color}; font-weight:600; font-size:14px;'>Safe!</div>", unsafe_allow_html=True)
-                    st.write("") 
-                col_idx += 1
-
-            # --- 4. GAME SECTION ---
-            st.markdown("""<hr style="border:1px solid rgba(128,128,128,0.2); margin: 40px 0;">""", unsafe_allow_html=True)
-            st.markdown("""<h3 style="font-size: 28px; font-weight: 700; margin-bottom: 20px; background: linear-gradient(to right, #6a11cb, #fbc2eb); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">🎮 Stress Buster Leaderboard</h3>""", unsafe_allow_html=True)
-
+            # Game Section (UPDATED STEP 3)
+            st.markdown("<hr style='margin:40px 0;opacity:0.2;'>", unsafe_allow_html=True)
+            st.markdown("### 🎮 Stress Buster Leaderboard")
             with st.expander("Play & View High Scores", expanded=False):
-                # 1. Fetch data from Cloud (might be stale)
-                full_leaderboard_df = get_leaderboard_data()
+                # 1. Fetch Cloud Data
+                full_lb = get_leaderboard_data()
                 
-                # 2. OPTIMISTIC UI FIX: Merge with latest score in memory
-                # If the user just played, their score is in st.session_state.latest_game_data
+                # 2. MERGE FRESH LOCAL SCORE (The Optimistic Fix)
                 if st.session_state.latest_game_data:
-                    # Create a 1-row DataFrame
                     new_row = pd.DataFrame([st.session_state.latest_game_data])
-                    # Concatenate with existing data so calculations include the fresh score
-                    full_leaderboard_df = pd.concat([full_leaderboard_df, new_row], ignore_index=True)
-                
+                    full_lb = pd.concat([full_lb, new_row], ignore_index=True)
+
                 col_ctrl, col_stats = st.columns([1, 2])
                 with col_ctrl:
-                    view_mode = st.radio("View High Score:", ["Overall College", "By Branch"], horizontal=True)
-                    
+                    view_mode = st.radio("View:", ["Overall College", "By Branch"], horizontal=True)
                     if view_mode == "By Branch":
-                        # Branch List as Cards (Buttons)
-                        st.markdown("#### Select Branch:")
-                        branch_list = [
-                            "Artificial Intelligence and Machine Learning",
-                            "Civil Engineering",
-                            "Computer Science and Engineering",
-                            "Electrical Engineering",
-                            "Instrumentation and Control Engineering",
-                            "Mechanical Engineering",
-                            "Manufacturing Science and Engineering",
-                            "Metallurgy and Materials Technology"
-                        ]
-                        
-                        # Create a 2-column grid for buttons (CHANGED FROM 4 TO 2)
-                        b_cols = st.columns(2)
-                        for i, br_name in enumerate(branch_list):
-                            with b_cols[i % 2]:
-                                # If selected, make it PRIMARY (highlighted), else SECONDARY
-                                btn_type = "primary" if st.session_state.selected_lb_branch == br_name else "secondary"
-                                if st.button(br_name, key=f"br_btn_{i}", type=btn_type, use_container_width=True):
-                                    st.session_state.selected_lb_branch = br_name
+                        br_list = ["Artificial Intelligence and Machine Learning", "Civil Engineering", "Computer Science and Engineering", "Electrical Engineering", "Instrumentation and Control Engineering", "Mechanical Engineering", "Manufacturing Science and Engineering", "Metallurgy and Materials Technology"]
+                        b_grid = st.columns(2)
+                        for i, b in enumerate(br_list):
+                            with b_grid[i%2]:
+                                if st.button(b, key=f"b_{i}", type="primary" if st.session_state.selected_lb_branch==b else "secondary"):
+                                    st.session_state.selected_lb_branch = b
                                     st.rerun()
-
-                overall_score, overall_name, overall_branch = get_overall_highest(full_leaderboard_df)
                 
-                display_score = 0
-                display_name = "-"
-                display_label = ""
-                
+                # Calculate Display Score based on Merged Data
                 if view_mode == "Overall College":
-                    display_score = overall_score
-                    display_name = f"{overall_name} ({overall_branch})"
-                    display_label = "🏆 College Record"
+                    sc, nm, br = get_overall_highest(full_lb)
+                    lbl = "🏆 College Record"
+                    dn = f"{nm} ({br})"
                 else:
-                    # Use the state variable for the selected branch
-                    s_score, s_name = get_branch_highest(full_leaderboard_df, st.session_state.selected_lb_branch)
-                    display_score = s_score
-                    display_name = s_name
-                    display_label = f"🥇 {st.session_state.selected_lb_branch} Topper"
+                    sc, nm = get_branch_highest(full_lb, st.session_state.selected_lb_branch)
+                    lbl = f"🥇 {st.session_state.selected_lb_branch} Topper"
+                    dn = nm
 
                 with col_stats:
-                    st.markdown(f"""
-                    <div style="background: linear-gradient(135deg, #FFD700 0%, #FDB931 100%); padding: 15px; border-radius: 12px; text-align: center; color: #5c3a1f; box-shadow: 0 4px 15px rgba(253, 185, 49, 0.4); display:flex; align-items:center; justify-content:space-around;">
-                        <div style="text-align:left;">
-                            <div style="font-size: 14px; font-weight: 700; text-transform:uppercase;">{display_label}</div>
-                            <div style="font-size: 24px; font-weight: 800;">{display_score}</div>
-                            <div style="font-size: 14px; opacity:0.9;">Held by: {display_name}</div>
-                        </div>
-                        <div style="font-size:40px;">👑</div>
-                    </div>
-                    """, unsafe_allow_html=True)
+                    st.markdown(f"""<div style="background:linear-gradient(135deg,#FFD700,#FDB931);padding:15px;border-radius:12px;text-align:center;color:#5c3a1f;display:flex;align-items:center;justify-content:space-around;"><div style="text-align:left;"><div style="font-size:14px;font-weight:700;">{lbl}</div><div style="font-size:24px;font-weight:800;">{sc}</div><div style="font-size:14px;">Held by: {dn}</div></div><div style="font-size:40px;">👑</div></div>""", unsafe_allow_html=True)
                 
                 st.markdown("---")
-                
-                c_game_main, c_game_info = st.columns([3, 1])
-                with c_game_main:
-                    game_html = render_game_html(mis)
-                    components.html(game_html, height=650, scrolling=False)
-                
-                with c_game_info:
+                c_game, c_info = st.columns([3, 1])
+                with c_game: components.html(render_game_html(mis), height=650, scrolling=False)
+                with c_info: 
                     st.info(f"**Playing as:**\n\n{name}\n\n({branch})")
-                    st.warning("⚠️ **Note:**\nWhen the game ends, the page will reload automatically to save your score.")
-
+                    st.warning("⚠️ **Note:** Page will reload to save score.")
         else:
             st.error("MIS not found.")
-            if st.button("Try Again"):
-                st.session_state.mis_no = ""
+            if st.button("Back"): 
+                st.session_state.mis_no=""
                 st.rerun()
 
-# FOOTER
-footer_color = "var(--footer-color)"
-st.markdown(f"""
-<div style="text-align: center; margin-top: 50px; font-size: 13px; color: {footer_color};">
-    Student Portal © 2026 • Built by <span style="color:#6a11cb; font-weight:700">IRONDEM2921 [AIML]</span>
-</div>
-""", unsafe_allow_html=True)
+st.markdown(f"<div style='text-align:center;margin-top:50px;font-size:13px;color:var(--text-color);'>Student Portal © 2026 • Built by <span style='color:#6a11cb;font-weight:700'>IRONDEM2921 [AIML]</span></div>", unsafe_allow_html=True)
