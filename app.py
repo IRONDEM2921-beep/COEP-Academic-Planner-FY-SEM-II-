@@ -903,7 +903,6 @@ def render_game_html(mis_user):
 </html>
 """
 """
-
 # --------------------------------------------------
 # 7. MAIN APPLICATION
 # --------------------------------------------------
@@ -915,7 +914,7 @@ if 'attendance' not in st.session_state:
     st.session_state.attendance = load_attendance()
 
 # -------------------------------------------------------
-# AUTO-SAVE SCORE HANDLER (MOVED TO TOP FOR PRIORITY)
+# AUTO-SAVE SCORE HANDLER
 # -------------------------------------------------------
 try:
     # Retrieve Params (Streamlit > 1.30 syntax)
@@ -924,22 +923,21 @@ try:
     user_check = qp.get("user")
     
     if new_score and user_check:
-        # Check against session state MIS (casted to string for safety)
-        # Note: Both are stripped of whitespace to prevent accidental mismatch
+        # Check against session state MIS
         if str(user_check).strip() == str(st.session_state.mis_no).strip():
             score_val = int(new_score)
             
-            # Fetch branch info if needed (mini-fetch to ensure we have context)
+            # Fetch branch info
             sub_dfs, sched_df, link_map = load_data()
             _, _, name, branch = get_schedule(st.session_state.mis_no, sub_dfs, sched_df)
             
-            # Find previous high score to see if it's a record
+            # Find previous high score
             full_df_temp = get_leaderboard_data()
             prev_high, _ = get_branch_highest(full_df_temp, branch)
             
             success, msg = update_leaderboard_score(name, branch, score_val)
             
-            # IMPORTANT: Wait for Google Sheet API to catch up
+            # Wait for API
             time.sleep(2.0)
             
             if score_val > prev_high:
@@ -947,12 +945,10 @@ try:
             else:
                 st.toast(f"Score saved: {score_val}", icon="✅")
         else:
-            # Debugging: Show why it failed if mismatch occurs
             st.error(f"Security Warning: Score mismatch. User in Link: '{user_check}' vs Logged In: '{st.session_state.mis_no}'")
         
-        # Clear params immediately
+        # Clear params and rerun
         st.query_params.clear()
-        # Force a rerun to clean URL and refresh leaderboard
         st.rerun()
 except Exception as e:
     pass
@@ -963,10 +959,11 @@ sub_dfs, sched_df, link_map = load_data()
 h1_col, toggle_col = st.columns([8, 1])
 with h1_col:
     st.markdown("""
-        <h1 style='text-align: left; background: linear-gradient(to right, #6a11cb, #2575fc); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-size: 3em; font-weight: 800; padding-top:10px;'>
-        ✨ Smart Semester Timetable
-        </h1>
+    <h1 style='text-align: left; background: linear-gradient(to right, #6a11cb, #2575fc); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-size: 3em; font-weight: 800; padding-top:10px;'>
+    ✨ Smart Semester Timetable
+    </h1>
     """, unsafe_allow_html=True)
+
 with toggle_col:
     st.write("") 
     st.write("") 
@@ -1090,28 +1087,24 @@ else:
                     st.write("") 
                 col_idx += 1
 
-            # --- 4. GAME SECTION (UPDATED) ---
+            # --- 4. GAME SECTION ---
             st.markdown("""<hr style="border:1px solid rgba(128,128,128,0.2); margin: 40px 0;">""", unsafe_allow_html=True)
             st.markdown("""<h3 style="font-size: 28px; font-weight: 700; margin-bottom: 20px; background: linear-gradient(to right, #6a11cb, #fbc2eb); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">🎮 Stress Buster Leaderboard</h3>""", unsafe_allow_html=True)
 
             with st.expander("Play & View High Scores", expanded=False):
-                # Data Fetching for Leaderboard
                 full_leaderboard_df = get_leaderboard_data()
                 
-                # --- Leaderboard Controls ---
                 col_ctrl, col_stats = st.columns([1, 2])
                 with col_ctrl:
                     view_mode = st.radio("View High Score:", ["Overall College", "By Branch"], horizontal=True)
                     
                     selected_branch_filter = "All"
                     if view_mode == "By Branch":
-                        # Populate branches dynamically from data + defaults
                         existing_branches = full_leaderboard_df['Branch'].unique().tolist() if not full_leaderboard_df.empty else []
                         defaults = ["AIML", "CSE", "IT", "ENTC", "MECH", "CIVIL", "INSTR"]
                         all_branches = sorted(list(set(existing_branches + defaults)))
                         selected_branch_filter = st.selectbox("Select Branch", all_branches, index=all_branches.index(branch) if branch in all_branches else 0)
 
-                # --- Calculate Stats ---
                 overall_score, overall_name, overall_branch = get_overall_highest(full_leaderboard_df)
                 
                 display_score = 0
@@ -1142,11 +1135,9 @@ else:
                 
                 st.markdown("---")
                 
-                # --- Game Render ---
                 c_game_main, c_game_info = st.columns([3, 1])
                 with c_game_main:
                     game_html = render_game_html(mis)
-                    # scrolling=False is crucial to prevent iframe scrollbars
                     components.html(game_html, height=650, scrolling=False)
                 
                 with c_game_info:
@@ -1166,6 +1157,3 @@ st.markdown(f"""
     Student Portal © 2026 • Built by <span style="color:#6a11cb; font-weight:700">IRONDEM2921 [AIML]</span>
 </div>
 """, unsafe_allow_html=True)
-
-
-
