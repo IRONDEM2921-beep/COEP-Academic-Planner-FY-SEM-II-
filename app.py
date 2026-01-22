@@ -512,14 +512,37 @@ def get_schedule(mis, sub_dfs, sched_df):
                 if not is_fuzzy_match(s_sub_clean, clean_text(row[t_sub_col])): continue
                 if normalize_division(row[t_div_col]) != s_div: continue
                 t_batch = normalize_batch(row[t_batch_col]) if t_batch_col else "all"
-                is_lab = "lab" in (str(row[t_type_col]).lower() if t_type_col else "")
-                if (not is_lab) or (t_batch == "all" or t_batch == s_batch):
+                
+                # --- MODIFICATION START ---
+                # Check for both "lab" and "tutorial"
+                type_str = str(row[t_type_col]).lower() if t_type_col else ""
+                is_lab = "lab" in type_str
+                is_tutorial = "tutorial" in type_str
+                
+                # Treat both as "batch-specific" sessions
+                is_batch_specific = is_lab or is_tutorial
+
+                if (not is_batch_specific) or (t_batch == "all" or t_batch == s_batch):
                     start, dur = parse_time(row[t_time_col])
                     if start:
+                        # Determine the correct label
+                        if is_lab:
+                            display_type = "LAB"
+                        elif is_tutorial:
+                            display_type = "TUTORIAL"
+                        else:
+                            display_type = "THEORY"
+
                         timetable.append({
-                            "Day": str(row[t_day_col]).title().strip(), "StartTime": start, "Duration": dur,
-                            "Subject": sub['Subject'], "Type": "LAB" if is_lab else "THEORY", "Venue": str(row[t_venue_col]) if t_venue_col else "-"
+                            "Day": str(row[t_day_col]).title().strip(), 
+                            "StartTime": start, 
+                            "Duration": dur,
+                            "Subject": sub['Subject'], 
+                            "Type": display_type, 
+                            "Venue": str(row[t_venue_col]) if t_venue_col else "-"
                         })
+                # --- MODIFICATION END ---
+                
     return found_subs, timetable, name, branch
 
 def render_grid(entries):
@@ -1045,3 +1068,4 @@ st.markdown(f"""
     Student Portal © 2026 • Built by <span style="color:#6a11cb; font-weight:700">IRONDEM2921 [AIML]</span>
 </div>
 """, unsafe_allow_html=True)
+
