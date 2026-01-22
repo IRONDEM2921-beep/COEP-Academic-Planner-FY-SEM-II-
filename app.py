@@ -323,19 +323,33 @@ def is_fuzzy_match(str1, str2):
     return SequenceMatcher(None, str1, str2).ratio() > 0.85
 
 def parse_time(time_str):
+    """
+    Parses time strings like '10:30 TO 12:30' or '1:30 - 3:30'.
+    Calculates duration. Handles AM/PM crossover (e.g., 11:30 to 1:30).
+    """
     if pd.isna(time_str): return None, 1
     raw = str(time_str).upper().replace('.', ':').replace('-', ' ').replace('TO', ' ')
     times = re.findall(r'(\d{1,2}:\d{2})', raw)
     if not times: return None, 1
+    
     start_str = times[0].lstrip("0")
     duration = 1
+    
     if len(times) >= 2:
         try:
             t1 = datetime.strptime(start_str, "%H:%M")
             t2 = datetime.strptime(times[1], "%H:%M")
+            
+            # --- FIX: Handle 12-hour crossover (e.g. 11:30 to 1:30) ---
+            # If end time is visually "smaller" than start time (e.g. 1 < 11),
+            # assume end time is PM (add 12 hours).
+            if t2 < t1:
+                t2 += timedelta(hours=12)
+            
             diff = (t2 - t1).total_seconds() / 60
             if diff > 80: duration = 2
         except: pass
+        
     return start_str, duration
 
 def map_to_slot(time_str, slots):
@@ -433,7 +447,8 @@ def generate_master_ics(weekly_schedule, semester_end_date):
 # --------------------------------------------------
 # 5. DATA LOADING & LOGIC
 # --------------------------------------------------
-@st.cache_data
+# FIX: Added ttl=60 to force cache refresh every 60 seconds.
+@st.cache_data(ttl=60)
 def load_data():
     if not os.path.exists(DATA_FOLDER): return [], None, {}
     sub_dfs = []
@@ -912,6 +927,12 @@ else:
                 
                 master_ics_data = generate_master_ics(table, SEMESTER_END)
                 st.sidebar.download_button(label="📥 Sync Full Semester", data=master_ics_data, file_name=f"My_Semester_Timetable_{mis}.ics", mime="text/calendar")
+                
+                # FIX: Clear Cache Button
+                if st.sidebar.button("Refresh Data / Clear Cache"):
+                    st.cache_data.clear()
+                    st.rerun()
+                
                 st.markdown(render_grid(table), unsafe_allow_html=True)
             else:
                 st.warning("No schedule found.")
