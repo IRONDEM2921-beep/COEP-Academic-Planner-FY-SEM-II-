@@ -99,6 +99,26 @@ html, body, [class*="css"], .stMarkdown, div, span, p, h1, h2, h3, h4, h5, h6 {{
     margin-bottom: 10px;
 }}
 
+/* --- FIX 1: SIDEBAR TEXT VISIBILITY --- */
+/* Ensure all text elements in the sidebar use the theme's text color */
+[data-testid="stSidebar"] p, [data-testid="stSidebar"] span, [data-testid="stSidebar"] div, [data-testid="stSidebar"] h1, [data-testid="stSidebar"] h2, [data-testid="stSidebar"] h3 {{
+    color: var(--text-color) !important;
+}}
+
+/* --- FIX 2: TOOLTIP VISIBILITY --- */
+/* Force tooltips (popovers) to match the theme's background and text color */
+div[data-baseweb="popover"], div[data-baseweb="tooltip"] {{
+    background-color: var(--card-bg) !important;
+    color: var(--text-color) !important;
+    border: 1px solid rgba(128, 128, 128, 0.2) !important;
+    box-shadow: 0 4px 15px var(--card-shadow) !important;
+}}
+/* Style the inner text container of the tooltip */
+div[data-baseweb="popover"] > div, div[data-baseweb="tooltip"] > div {{
+    background-color: transparent !important;
+    color: var(--text-color) !important;
+}}
+
 /* --- FIX: SIDEBAR DOWNLOAD BUTTON VISIBILITY --- */
 [data-testid="stSidebar"] .stDownloadButton button {{
     border: 1px solid rgba(255,255,255,0.3) !important;
@@ -884,7 +904,7 @@ else:
             
             if table:
                 st.sidebar.markdown("---")
-                st.sidebar.markdown(f"""<h3 style='background: linear-gradient(45deg, #a18cd1, #fbc2eb); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-weight: 700; margin-bottom: 5px;'>📲 Calendar Sync</h3><p style='font-size: 11px; color: var(--text-color); margin-bottom: 10px;'>One click to add your entire semester schedule to your phone.</p>""", unsafe_allow_html=True)
+                st.sidebar.markdown(f"""<h3 style='background: linear-gradient(45deg, #a18cd1, #fbc2eb); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-weight: 700; margin-bottom: 5px;'>📲 Calendar Sync</h3><p style='font-size: 11px; margin-bottom: 10px;'>One click to add your entire semester schedule to your phone.</p>""", unsafe_allow_html=True)
                 master_ics_data = generate_master_ics(table, SEMESTER_END)
                 st.sidebar.download_button(label="📥 Sync Full Semester", data=master_ics_data, file_name=f"My_Semester_Timetable_{mis}.ics", mime="text/calendar")
                 st.markdown(render_grid(table), unsafe_allow_html=True)
