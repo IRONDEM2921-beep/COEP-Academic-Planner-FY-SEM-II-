@@ -100,7 +100,7 @@ html, body, [class*="css"], .stMarkdown, div, span, p, h1, h2, h3, h4, h5, h6 {{
 }}
 
 /* --- FIX 1: SIDEBAR TEXT VISIBILITY --- */
-/* Ensure all text elements in the sidebar use the theme's text color */
+/* Ensure generic text elements in the sidebar use the theme's text color */
 [data-testid="stSidebar"] p, [data-testid="stSidebar"] span, [data-testid="stSidebar"] div, [data-testid="stSidebar"] h1, [data-testid="stSidebar"] h2, [data-testid="stSidebar"] h3 {{
     color: var(--text-color) !important;
 }}
@@ -904,7 +904,12 @@ else:
             
             if table:
                 st.sidebar.markdown("---")
-                st.sidebar.markdown(f"""<h3 style='background: linear-gradient(45deg, #a18cd1, #fbc2eb); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-weight: 700; margin-bottom: 5px;'>📲 Calendar Sync</h3><p style='font-size: 11px; margin-bottom: 10px;'>One click to add your entire semester schedule to your phone.</p>""", unsafe_allow_html=True)
+                # MODIFIED: Applied gradient text style to the sidebar description
+                st.sidebar.markdown(f"""
+                <h3 style='background: linear-gradient(45deg, #a18cd1, #fbc2eb); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-weight: 700; margin-bottom: 5px;'>📲 Calendar Sync</h3>
+                <p style='font-size: 11px; margin-bottom: 10px; background: linear-gradient(90deg, #E0C3FC, #8EC5FC); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-weight: 600;'>One click to add your entire semester schedule to your phone.</p>
+                """, unsafe_allow_html=True)
+                
                 master_ics_data = generate_master_ics(table, SEMESTER_END)
                 st.sidebar.download_button(label="📥 Sync Full Semester", data=master_ics_data, file_name=f"My_Semester_Timetable_{mis}.ics", mime="text/calendar")
                 st.markdown(render_grid(table), unsafe_allow_html=True)
