@@ -99,6 +99,26 @@ html, body, [class*="css"], .stMarkdown, div, span, p, h1, h2, h3, h4, h5, h6 {{
     margin-bottom: 10px;
 }}
 
+/* --- FIX: SIDEBAR DOWNLOAD BUTTON VISIBILITY --- */
+[data-testid="stSidebar"] .stDownloadButton button {{
+    border: 1px solid rgba(255,255,255,0.3) !important;
+    background: transparent !important;
+}}
+
+/* Apply Light Gradient to the Text inside the sidebar button */
+[data-testid="stSidebar"] .stDownloadButton button * {{
+    background: linear-gradient(90deg, #E0C3FC 0%, #8EC5FC 100%) !important;
+    -webkit-background-clip: text !important;
+    -webkit-text-fill-color: transparent !important;
+    font-weight: 700 !important;
+    font-size: 15px !important;
+}}
+
+[data-testid="stSidebar"] .stDownloadButton button:hover {{
+    border-color: #8EC5FC !important;
+    transform: translateY(-2px);
+}}
+
 /* --- INPUT BOXES --- */
 div[data-baseweb="input"] {{
     border: none;
@@ -123,7 +143,7 @@ div.stButton > button {{
     align-items: center !important;
     justify-content: center !important;
     border-radius: 15px !important;
-    font-size: 13px !important;     
+    font-size: 13px !important;      
     text-align: center !important;
 }}
 
@@ -358,6 +378,8 @@ def generate_master_ics(weekly_schedule, semester_end_date):
         try:
             target_day_name = cls['Day'] 
             if target_day_name not in days_list: continue
+            
+            # Calculate days ahead
             target_idx = days_list.index(target_day_name)
             current_idx = today.weekday()
             days_ahead = target_idx - current_idx if target_idx >= current_idx else 7 - (current_idx - target_idx)
@@ -977,4 +999,3 @@ st.markdown(f"""
     Student Portal © 2026 • Built by <span style="color:#6a11cb; font-weight:700">IRONDEM2921 [AIML]</span>
 </div>
 """, unsafe_allow_html=True)
-
