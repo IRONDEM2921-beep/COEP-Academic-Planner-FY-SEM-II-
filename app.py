@@ -362,9 +362,19 @@ def generate_master_ics(weekly_schedule, semester_end_date):
             current_idx = today.weekday()
             days_ahead = target_idx - current_idx if target_idx >= current_idx else 7 - (current_idx - target_idx)
             start_date = today + timedelta(days=days_ahead)
+            
+            # --- START FIX: 12-hour to 24-hour conversion ---
             start_h, start_m = map(int, cls['StartTime'].split(':'))
+            
+            # If hour is between 1 and 7, assume it is PM (Afternoon) and add 12
+            # e.g., 1:30 becomes 13:30. 8:30 stays 8:30.
+            if start_h < 8:
+                start_h += 12
+            # --- END FIX ---
+
             dt_start = datetime.combine(start_date, datetime.min.time()).replace(hour=start_h, minute=start_m)
             dt_end = dt_start + timedelta(hours=cls.get('Duration', 1))
+            
             fmt = "%Y%m%dT%H%M%S"
             until_str = semester_end_date.strftime("%Y%m%dT235959")
             rrule_day = day_map.get(target_day_name, "MO")
@@ -967,3 +977,4 @@ st.markdown(f"""
     Student Portal © 2026 • Built by <span style="color:#6a11cb; font-weight:700">IRONDEM2921 [AIML]</span>
 </div>
 """, unsafe_allow_html=True)
+
