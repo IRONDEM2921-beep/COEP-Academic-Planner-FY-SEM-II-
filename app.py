@@ -185,7 +185,7 @@ table.custom-grid {{ width: 100%; min-width: 1000px; border-collapse: separate; 
 }}
 .class-card.filled:hover {{ transform: translateY(-5px) scale(1.03); box-shadow: 0 15px 30px rgba(0,0,0,0.15) !important; z-index: 100; }}
 
-/* --- NEW EMPTY SLOT DESIGN --- */
+/* --- NEW EMPTY SLOT DESIGN (Fixed Braces) --- */
 .type-empty {{ 
     background: var(--card-bg); 
     border: 2px dashed rgba(160, 160, 200, 0.3); 
@@ -203,27 +203,27 @@ table.custom-grid {{ width: 100%; min-width: 1000px; border-collapse: separate; 
     background: var(--table-row-hover); 
     transform: scale(0.98);
 }}
-.empty-title {
+.empty-title {{
     color: var(--text-color);
     opacity: 0.5;
     font-size: 14px;
     font-weight: 600;
-}
-.empty-icon {
+}}
+.empty-icon {{
     font-size: 32px;
     color: #8EC5FC;
     font-weight: 300;
     margin: 5px 0;
-}
-.empty-hint {
+}}
+.empty-hint {{
     font-size: 10px;
     color: var(--text-color);
     opacity: 0;
     transition: opacity 0.2s;
-}
-.type-empty:hover .empty-hint {
+}}
+.type-empty:hover .empty-hint {{
     opacity: 0.6;
-}
+}}
 
 .sub-title {{ font-weight: 700; font-size: 13px; margin-bottom: 4px; }}
 .sub-meta {{ font-size: 11px; opacity: 0.9; }}
