@@ -299,9 +299,9 @@ div[data-testid="stDialog"] {{
     border: 1px solid rgba(128,128,128,0.1);
 }}
 /* Hide the bridge input */
-.venue-bridge-hidden {
+.venue-bridge-hidden {{
     display: none;
-}
+}}
 </style>
 """, unsafe_allow_html=True)
 
