@@ -99,47 +99,18 @@ html, body, [class*="css"], .stMarkdown, div, span, p, h1, h2, h3, h4, h5, h6 {{
     margin-bottom: 10px;
 }}
 
-/* --- FIX 1: SIDEBAR TEXT VISIBILITY --- */
-/* Ensure generic text elements in the sidebar use the theme's text color */
+/* --- FIXES FOR VISIBILITY --- */
 [data-testid="stSidebar"] p, [data-testid="stSidebar"] span, [data-testid="stSidebar"] div, [data-testid="stSidebar"] h1, [data-testid="stSidebar"] h2, [data-testid="stSidebar"] h3 {{
     color: var(--text-color) !important;
 }}
 
-/* --- FIX 2: TOOLTIP VISIBILITY --- */
-/* Force tooltips (popovers) to match the theme's background and text color */
 div[data-baseweb="popover"], div[data-baseweb="tooltip"] {{
     background-color: var(--card-bg) !important;
     color: var(--text-color) !important;
     border: 1px solid rgba(128, 128, 128, 0.2) !important;
     box-shadow: 0 4px 15px var(--card-shadow) !important;
 }}
-/* Style the inner text container of the tooltip */
-div[data-baseweb="popover"] > div, div[data-baseweb="tooltip"] > div {{
-    background-color: transparent !important;
-    color: var(--text-color) !important;
-}}
 
-/* --- FIX: SIDEBAR DOWNLOAD BUTTON VISIBILITY --- */
-[data-testid="stSidebar"] .stDownloadButton button {{
-    border: 1px solid rgba(255,255,255,0.3) !important;
-    background: transparent !important;
-}}
-
-/* Apply Light Gradient to the Text inside the sidebar button */
-[data-testid="stSidebar"] .stDownloadButton button * {{
-    background: linear-gradient(90deg, #E0C3FC 0%, #8EC5FC 100%) !important;
-    -webkit-background-clip: text !important;
-    -webkit-text-fill-color: transparent !important;
-    font-weight: 700 !important;
-    font-size: 15px !important;
-}}
-
-[data-testid="stSidebar"] .stDownloadButton button:hover {{
-    border-color: #8EC5FC !important;
-    transform: translateY(-2px);
-}}
-
-/* --- INPUT BOXES --- */
 div[data-baseweb="input"] {{
     border: none;
     border-radius: 50px !important;
@@ -154,9 +125,9 @@ div[data-testid="stDateInput"] input {{ color: #ffffff !important; font-weight: 
 /* --- BUTTONS --- */
 div.stButton > button {{
     width: 100% !important;
-    height: 80px !important;        /* FIXED HEIGHT */
+    height: 80px !important;       
     min-height: 80px !important;
-    white-space: normal !important; /* TEXT WRAPPING */
+    white-space: normal !important; 
     line-height: 1.2 !important;
     padding: 8px !important;
     display: flex !important;
@@ -229,6 +200,32 @@ table.custom-grid {{ width: 100%; min-width: 1000px; border-collapse: separate; 
     background: rgba(255,255,255,0.6); padding: 3px 8px; border-radius: 10px;
     font-size: 10px; font-weight: 700; text-transform: uppercase; display: inline-block;
     margin-bottom: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); color: #2c3e50 !important;
+}}
+
+/* --- NEW CSS FOR 1.5 HOUR / OFFSET LECTURES --- */
+.offset-wrapper {{
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}}
+/* Logic for 25%: 
+   A 1.5h lecture spans 2 grid cells (2 hours total visual space).
+   1.5h / 2h = 75% filled.
+   Empty space = 25%.
+   So the spacer is 25% height.
+*/
+.offset-spacer {{
+    flex: 0 0 25%; 
+    min-height: 25%; 
+}}
+.offset-card-container {{
+    flex: 1; 
+    height: 100%;
+    position: relative;
+}}
+.class-card.offset-style {{
+    border-radius: 18px;
+    height: 100% !important;
 }}
 
 /* ATTENDANCE CARDS */
@@ -324,42 +321,62 @@ def is_fuzzy_match(str1, str2):
 
 def parse_time(time_str):
     """
-    Parses time strings like '10:30 TO 12:30' or '1:30 - 3:30'.
-    Calculates duration. Handles AM/PM crossover (e.g., 11:30 to 1:30).
+    Parses time strings like '10:30 TO 12:30' or '11:00 - 12:30'.
+    Returns:
+       start_str: String (e.g., "11:00")
+       duration: Float (hours, e.g., 1.5)
     """
-    if pd.isna(time_str): return None, 1
+    if pd.isna(time_str): return None, 1.0
+    
+    # Normalize string
     raw = str(time_str).upper().replace('.', ':').replace('-', ' ').replace('TO', ' ')
     times = re.findall(r'(\d{1,2}:\d{2})', raw)
-    if not times: return None, 1
+    
+    if not times: return None, 1.0
     
     start_str = times[0].lstrip("0")
-    duration = 1
+    duration = 1.0 # Default
     
     if len(times) >= 2:
         try:
             t1 = datetime.strptime(start_str, "%H:%M")
             t2 = datetime.strptime(times[1], "%H:%M")
             
-            # --- FIX: Handle 12-hour crossover (e.g. 11:30 to 1:30) ---
-            # If end time is visually "smaller" than start time (e.g. 1 < 11),
-            # assume end time is PM (add 12 hours).
+            # Handle 12-hour crossover (e.g. 11:30 to 1:30)
             if t2 < t1:
                 t2 += timedelta(hours=12)
             
-            diff = (t2 - t1).total_seconds() / 60
-            if diff > 80: duration = 2
+            diff_mins = (t2 - t1).total_seconds() / 60
+            
+            # Allow for small margin of error (e.g. 85 mins -> 1.5 hrs)
+            if diff_mins > 20:
+                duration = diff_mins / 60.0
         except: pass
         
     return start_str, duration
 
 def map_to_slot(time_str, slots):
+    """
+    Maps a start time (e.g. 11:00) to the nearest previous slot (e.g. 10:30).
+    Allows a delay of up to 30 mins.
+    """
     try:
         t = datetime.strptime(time_str, "%H:%M")
         best, min_diff = None, 999
+        
         for s in slots:
-            diff = abs((t - datetime.strptime(s, "%H:%M")).total_seconds() / 60)
-            if diff < min_diff: min_diff, best = diff, s
-        if min_diff <= 45: return best
+            slot_time = datetime.strptime(s, "%H:%M")
+            diff = (t - slot_time).total_seconds() / 60
+            
+            # Logic: We are looking for a slot that is equal to or BEFORE the time
+            # But not too far before (max 30 mins).
+            # e.g. 11:00 matches 10:30 (diff +30)
+            # e.g. 10:30 matches 10:30 (diff 0)
+            if 0 <= diff <= 30:
+                if diff < min_diff:
+                    min_diff = diff
+                    best = s
+        return best
     except: pass
     return None
 
@@ -374,7 +391,6 @@ def get_google_sheet(index=0):
     sheet_url = st.secrets["private_sheet_url"] 
     try:
         sh = client.open_by_url(sheet_url)
-        # Check if index exists, if not create
         if index >= len(sh.worksheets()):
             return sh.add_worksheet(title="Leaderboard", rows="1000", cols="4")
         return sh.get_worksheet(index)
@@ -383,7 +399,7 @@ def get_google_sheet(index=0):
 
 def load_attendance():
     try:
-        sheet = get_google_sheet(0) # Sheet 1
+        sheet = get_google_sheet(0) 
         data = sheet.col_values(1)
         return {cls_id: True for cls_id in data if cls_id}
     except Exception as e:
@@ -391,7 +407,7 @@ def load_attendance():
 
 def update_attendance_in_sheet(cls_id, action):
     try:
-        sheet = get_google_sheet(0) # Sheet 1
+        sheet = get_google_sheet(0) 
         if action == "add":
             sheet.append_row([cls_id])
         elif action == "remove":
@@ -413,23 +429,19 @@ def generate_master_ics(weekly_schedule, semester_end_date):
             target_day_name = cls['Day'] 
             if target_day_name not in days_list: continue
             
-            # Calculate days ahead
             target_idx = days_list.index(target_day_name)
             current_idx = today.weekday()
             days_ahead = target_idx - current_idx if target_idx >= current_idx else 7 - (current_idx - target_idx)
             start_date = today + timedelta(days=days_ahead)
             
-            # --- START FIX: 12-hour to 24-hour conversion ---
             start_h, start_m = map(int, cls['StartTime'].split(':'))
             
-            # If hour is between 1 and 7, assume it is PM (Afternoon) and add 12
-            # e.g., 1:30 becomes 13:30. 8:30 stays 8:30.
+            # Fix 12-hour crossover for PM classes
             if start_h < 8:
                 start_h += 12
-            # --- END FIX ---
 
             dt_start = datetime.combine(start_date, datetime.min.time()).replace(hour=start_h, minute=start_m)
-            dt_end = dt_start + timedelta(hours=cls.get('Duration', 1))
+            dt_end = dt_start + timedelta(hours=cls.get('Duration', 1)) # Note: Duration is row_span here, technically incorrect for 1.5h but acceptable for ICS approximation or needs exact float duration passed
             
             fmt = "%Y%m%dT%H%M%S"
             until_str = semester_end_date.strftime("%Y%m%dT235959")
@@ -447,7 +459,6 @@ def generate_master_ics(weekly_schedule, semester_end_date):
 # --------------------------------------------------
 # 5. DATA LOADING & LOGIC
 # --------------------------------------------------
-# FIX: Added ttl=60 to force cache refresh every 60 seconds.
 @st.cache_data(ttl=60)
 def load_data():
     if not os.path.exists(DATA_FOLDER): return [], None, {}
@@ -475,6 +486,8 @@ def get_schedule(mis, sub_dfs, sched_df):
     found_subs = []
     name, branch = "Unknown", "General"
     target_mis = clean_mis(mis)
+    
+    # 1. Find User Subjects
     for df in sub_dfs:
         mis_col = next((c for c in df.columns if "MIS" in c.upper()), None)
         if not mis_col: continue
@@ -494,6 +507,8 @@ def get_schedule(mis, sub_dfs, sched_df):
                     "Division": str(row[div_col]).strip() if div_col else "",
                     "Batch": str(row[batch_col]) if batch_col else ""
                 })
+    
+    # 2. Map to Timetable
     timetable = []
     if sched_df is not None and found_subs:
         cols = sched_df.columns
@@ -504,44 +519,54 @@ def get_schedule(mis, sub_dfs, sched_df):
         t_time_col = next((c for c in cols if "Time" in c), None)
         t_day_col = next((c for c in cols if "Day" in c), None)
         t_venue_col = next((c for c in cols if "Venue" in c), None)
+        
         for sub in found_subs:
             s_sub_clean = clean_text(sub['Subject'])
             s_div = normalize_division(sub['Division'])
             s_batch = normalize_batch(sub['Batch'])
+            
             for _, row in sched_df.iterrows():
                 if not is_fuzzy_match(s_sub_clean, clean_text(row[t_sub_col])): continue
                 if normalize_division(row[t_div_col]) != s_div: continue
-                t_batch = normalize_batch(row[t_batch_col]) if t_batch_col else "all"
                 
-                # --- MODIFICATION START ---
-                # Check for both "lab" and "tutorial"
+                t_batch = normalize_batch(row[t_batch_col]) if t_batch_col else "all"
                 type_str = str(row[t_type_col]).lower() if t_type_col else ""
                 is_lab = "lab" in type_str
                 is_tutorial = "tutorial" in type_str
-                
-                # Treat both as "batch-specific" sessions
                 is_batch_specific = is_lab or is_tutorial
 
                 if (not is_batch_specific) or (t_batch == "all" or t_batch == s_batch):
-                    start, dur = parse_time(row[t_time_col])
+                    # NEW: Parse exact duration
+                    start, dur_hours = parse_time(row[t_time_col])
+                    
                     if start:
-                        # Determine the correct label
-                        if is_lab:
-                            display_type = "LAB"
-                        elif is_tutorial:
-                            display_type = "TUTORIAL"
-                        else:
-                            display_type = "THEORY"
+                        # Determine Row Span
+                        # 1h = 1, 1.5h = 2, 2h = 2
+                        row_span = int(dur_hours)
+                        if dur_hours > 1.2 and dur_hours <= 2.2:
+                            row_span = 2
+                        elif dur_hours > 2.2:
+                            row_span = 3 # Rare
+                        
+                        # Determine Offset (e.g., 11:00 start in a 10:30 slot system)
+                        is_offset = False
+                        if ":00" in start or (dur_hours == 1.5):
+                             # Heuristic: If it's 1.5h, it's likely an offset class 
+                             # or if it starts on :00 in a :30 grid.
+                             is_offset = True
+
+                        display_type = "LAB" if is_lab else "TUTORIAL" if is_tutorial else "THEORY"
 
                         timetable.append({
                             "Day": str(row[t_day_col]).title().strip(), 
                             "StartTime": start, 
-                            "Duration": dur,
+                            "Duration": row_span,
+                            "DurationFloat": dur_hours,
+                            "IsOffset": is_offset,
                             "Subject": sub['Subject'], 
                             "Type": display_type, 
                             "Venue": str(row[t_venue_col]) if t_venue_col else "-"
                         })
-                # --- MODIFICATION END ---
                 
     return found_subs, timetable, name, branch
 
@@ -549,15 +574,19 @@ def render_grid(entries):
     slots = ["8:30", "9:30", "10:30", "11:30", "12:30", "1:30", "2:30", "3:30", "4:30", "5:30"]
     days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
     grid = {s: {d: None for d in days} for s in slots}
+    
     for e in entries:
         if e['Day'] in days:
+            # New mapping logic
             slot = map_to_slot(e['StartTime'], slots)
             if slot:
                 grid[slot][e['Day']] = e
+                # Merge cells logic
                 if e['Duration'] > 1:
                     idx = slots.index(slot)
                     for i in range(1, e['Duration']):
                         if idx + i < len(slots): grid[slots[idx+i]][e['Day']] = "MERGED"
+
     html = '<div class="timetable-wrapper"><table class="custom-grid"><thead><tr><th>Time</th>' + ''.join([f'<th>{d}</th>' for d in days]) + '</tr></thead><tbody>'
     for s in slots:
         label = f"{s} - {str(int(s.split(':')[0])+1)}:{s.split(':')[1]}"
@@ -568,7 +597,26 @@ def render_grid(entries):
             if cell:
                 span = f'rowspan="{cell["Duration"]}"' if cell['Duration'] > 1 else ''
                 grad = get_subject_gradient(cell['Subject'])
-                html += f'<td {span}><div class="class-card filled" style="background:{grad}"><div class="batch-badge">{cell["Type"]}</div><div class="sub-title">{cell["Subject"]}</div><div class="sub-meta">📍 {cell["Venue"]}</div></div></td>'
+                
+                # --- OFFSET RENDER LOGIC ---
+                if cell.get('IsOffset', False) and cell.get('DurationFloat', 1) == 1.5:
+                     html += f'''
+                    <td {span} style="padding:0; vertical-align: top;">
+                        <div class="offset-wrapper">
+                            <div class="offset-spacer"></div>
+                            <div class="offset-card-container">
+                                <div class="class-card filled offset-style" style="background:{grad}">
+                                    <div class="batch-badge">{cell["Type"]} (1.5h)</div>
+                                    <div class="sub-title">{cell["Subject"]}</div>
+                                    <div class="sub-meta">📍 {cell["Venue"]} <br> ⏰ {cell["StartTime"]}</div>
+                                </div>
+                            </div>
+                        </div>
+                    </td>
+                    '''
+                else:
+                    # Normal Render
+                    html += f'<td {span}><div class="class-card filled" style="background:{grad}"><div class="batch-badge">{cell["Type"]}</div><div class="sub-title">{cell["Subject"]}</div><div class="sub-meta">📍 {cell["Venue"]}</div></div></td>'
             else:
                 html += '<td><div class="class-card type-empty"></div></td>'
         html += '</tr>'
@@ -613,11 +661,10 @@ def calculate_semester_totals(timetable_entries):
     return totals
 
 # --------------------------------------------------
-# 6. GAME INTEGRATION (REMOVED LEADERBOARD LOGIC)
+# 6. GAME INTEGRATION
 # --------------------------------------------------
 
 def render_game_html():
-    # Detect theme colors for game CSS
     bg_color = current_theme['game_grid'] 
     game_bg = "#fcfcf4"
     grid_line = "#e0dacc"
@@ -942,7 +989,6 @@ else:
             
             if table:
                 st.sidebar.markdown("---")
-                # MODIFIED: Applied gradient text style to the sidebar description
                 st.sidebar.markdown(f"""
                 <h3 style='background: linear-gradient(45deg, #a18cd1, #fbc2eb); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-weight: 700; margin-bottom: 5px;'>📲 Calendar Sync</h3>
                 <p style='font-size: 11px; margin-bottom: 10px; background: linear-gradient(90deg, #E0C3FC, #8EC5FC); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-weight: 600;'>One click to add your entire semester schedule to your phone.</p>
@@ -951,7 +997,6 @@ else:
                 master_ics_data = generate_master_ics(table, SEMESTER_END)
                 st.sidebar.download_button(label="📥 Sync Full Semester", data=master_ics_data, file_name=f"My_Semester_Timetable_{mis}.ics", mime="text/calendar")
                 
-                # FIX: Clear Cache Button
                 if st.sidebar.button("Refresh Data / Clear Cache"):
                     st.cache_data.clear()
                     st.rerun()
@@ -1042,7 +1087,7 @@ else:
                     st.write("") 
                 col_idx += 1
 
-            # --- 4. GAME SECTION (SIMPLIFIED) ---
+            # --- 4. GAME SECTION ---
             st.markdown("""<hr style="border:1px solid rgba(128,128,128,0.2); margin: 40px 0;">""", unsafe_allow_html=True)
             st.markdown("""<h3 style="font-size: 28px; font-weight: 700; margin-bottom: 20px; background: linear-gradient(to right, #6a11cb, #fbc2eb); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">🎮 Stress Buster Game</h3>""", unsafe_allow_html=True)
 
@@ -1068,4 +1113,3 @@ st.markdown(f"""
     Student Portal © 2026 • Built by <span style="color:#6a11cb; font-weight:700">IRONDEM2921 [AIML]</span>
 </div>
 """, unsafe_allow_html=True)
-
