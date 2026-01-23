@@ -97,17 +97,19 @@ html, body, [class*="css"], .stMarkdown, div, span, p, h1, h2, h3, h4, h5, h6 {{
     color: var(--text-color);
 }}
 
-/* --- HIDE THE BRIDGE INPUT SAFELY --- */
-/* We use opacity 0 so JS can still find it, but user cannot see it */
+/* --- HIDE THE BRIDGE INPUT (Improved Selector) --- */
+/* This hides the input container but keeps it in the DOM for JS to find */
+div[data-testid="stTextInput"] {{
+    position: relative;
+}}
 div[data-testid="stTextInput"]:has(input[aria-label="venue_bridge_input"]) {{
-    opacity: 0;
-    height: 0px;
-    width: 0px;
-    overflow: hidden;
-    margin: 0;
-    padding: 0;
     position: absolute;
-    z-index: -1;
+    top: -9999px;
+    left: -9999px;
+    height: 0;
+    width: 0;
+    overflow: hidden;
+    opacity: 0;
 }}
 
 /* --- BUTTONS & INPUTS --- */
@@ -193,7 +195,8 @@ table.custom-grid {{ width: 100%; min-width: 1000px; border-collapse: separate; 
 }}
 .class-card.filled:hover {{ transform: translateY(-5px) scale(1.03); box-shadow: 0 15px 30px rgba(0,0,0,0.15) !important; z-index: 100; }}
 
-/* --- NEW EMPTY SLOT DESIGN (Fixed) --- */
+/* --- CRITICAL FIX FOR FREE SLOTS --- */
+/* user-select: none prevents text selection so double click fires correctly */
 .type-empty {{ 
     background: var(--card-bg); 
     border: 2px dashed rgba(160, 160, 200, 0.3); 
@@ -204,30 +207,44 @@ table.custom-grid {{ width: 100%; min-width: 1000px; border-collapse: separate; 
     align-items: center;
     justify-content: center;
     text-align: center;
-    transition: all 0.2s;
+    transition: all 0.1s;
+    user-select: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
 }}
 .type-empty:hover {{ 
     border-color: #8EC5FC; 
     background: var(--table-row-hover); 
-    transform: scale(0.98);
+    transform: scale(0.99);
 }}
+/* Active state gives visual feedback when clicked */
+.type-empty:active {{
+    background-color: #e6e6e6;
+    transform: scale(0.95);
+    border-color: #6a11cb;
+}}
+
 .empty-title {{
     color: var(--text-color);
     opacity: 0.5;
     font-size: 14px;
     font-weight: 600;
+    pointer-events: none; /* Let clicks pass to parent */
 }}
 .empty-icon {{
     font-size: 32px;
     color: #8EC5FC;
     font-weight: 300;
     margin: 5px 0;
+    pointer-events: none;
 }}
 .empty-hint {{
     font-size: 10px;
     color: var(--text-color);
     opacity: 0;
     transition: opacity 0.2s;
+    pointer-events: none;
 }}
 .type-empty:hover .empty-hint {{
     opacity: 0.6;
@@ -682,7 +699,6 @@ def render_grid(entries):
                 else:
                     html += f'<td {span}><div class="class-card filled" style="background:{grad}"><div class="batch-badge">{cell["Type"]}</div><div class="sub-title">{cell["Subject"]}</div><div class="sub-meta">📍 {cell["Venue"]}</div></div></td>'
             else:
-                # NEW EMPTY SLOT DESIGN
                 html += f'''<td>
                     <div class="type-empty js-free-slot-trigger" data-day="{d}" data-time="{s}">
                         <div class="empty-title">Free Slot</div>
@@ -694,10 +710,7 @@ def render_grid(entries):
     return html + '</tbody></table></div>'
 
 def render_subject_html(subjects, link_map):
-    # RESTORED SUBJECT UI
-    html_parts = ["""
-    <div class="sub-alloc-wrapper"><table class="sub-alloc-table"><thead><tr><th style="width:40%">Subject Name</th><th style="width:20%">Batch</th><th style="width:20%">Division</th><th style="width:20%">Material</th></tr></thead><tbody>
-    """]
+    html_parts = ["""<div class="sub-alloc-wrapper"><table class="sub-alloc-table"><thead><tr><th style="width:40%">Subject Name</th><th style="width:20%">Batch</th><th style="width:20%">Division</th><th style="width:20%">Material</th></tr></thead><tbody>"""]
     for sub in subjects:
         link = link_map.get(clean_text(sub.get('Subject')), "#")
         link_html = f'<a href="{link}" target="_blank" class="drive-btn">📂 Open Drive</a>' if link != "#" else "<span style='color:#aaa'>No Link</span>"
