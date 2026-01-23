@@ -7,6 +7,7 @@ import os
 import re
 import zlib
 import json
+import random
 from datetime import datetime, timedelta, date
 from difflib import SequenceMatcher
 import time
@@ -49,8 +50,8 @@ light_theme = {
     "game_bg": "#fcfcf4",
     "game_grid": "#e0dacc",
     "modal_bg": "#ffffff",
-    "venue_badge_bg": "#f0f2f6",
-    "venue_badge_text": "#2c3e50"
+    "venue_card_bg": "#ffffff",
+    "venue_border": "#e0e0e0"
 }
 
 dark_theme = {
@@ -64,8 +65,8 @@ dark_theme = {
     "game_bg": "#1a1a1a",
     "game_grid": "#333333",
     "modal_bg": "#262730",
-    "venue_badge_bg": "#363945",
-    "venue_badge_text": "#ffffff"
+    "venue_card_bg": "#2d2d2d",
+    "venue_border": "#444"
 }
 
 current_theme = light_theme if st.session_state.theme == 'light' else dark_theme
@@ -83,8 +84,8 @@ st.markdown(f"""
     --sec-btn-bg: {current_theme['secondary_btn_bg']};
     --sec-btn-text: {current_theme['secondary_btn_text']};
     --modal-bg: {current_theme['modal_bg']};
-    --venue-badge-bg: {current_theme['venue_badge_bg']};
-    --venue-badge-text: {current_theme['venue_badge_text']};
+    --venue-card-bg: {current_theme['venue_card_bg']};
+    --venue-border: {current_theme['venue_border']};
 }}
 
 .stApp {{ background-color: var(--bg-color); }}
@@ -94,8 +95,7 @@ html, body, [class*="css"], .stMarkdown, div, span, p, h1, h2, h3, h4, h5, h6 {{
     color: var(--text-color);
 }}
 
-/* --- HIDE THE BRIDGE INPUT (Corrected) --- */
-/* We target the container of the input with the specific aria-label */
+/* --- HIDE THE BRIDGE INPUT --- */
 div[data-testid="stTextInput"]:has(input[aria-label="venue_bridge_input"]) {{
     display: none !important;
     visibility: hidden !important;
@@ -184,8 +184,47 @@ table.custom-grid {{ width: 100%; min-width: 1000px; border-collapse: separate; 
     color: #2c3e50 !important; border: none !important; box-shadow: none !important;
 }}
 .class-card.filled:hover {{ transform: translateY(-5px) scale(1.03); box-shadow: 0 15px 30px rgba(0,0,0,0.15) !important; z-index: 100; }}
-.type-empty {{ background: var(--card-bg); border: 2px dashed rgba(160, 160, 200, 0.2); border-radius: 18px; cursor: pointer; }}
-.type-empty:hover {{ border-color: #8EC5FC; background: var(--table-row-hover); }}
+
+/* --- NEW EMPTY SLOT DESIGN --- */
+.type-empty {{ 
+    background: var(--card-bg); 
+    border: 2px dashed rgba(160, 160, 200, 0.3); 
+    border-radius: 18px; 
+    cursor: pointer; 
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    transition: all 0.2s;
+}}
+.type-empty:hover {{ 
+    border-color: #8EC5FC; 
+    background: var(--table-row-hover); 
+    transform: scale(0.98);
+}}
+.empty-title {
+    color: var(--text-color);
+    opacity: 0.5;
+    font-size: 14px;
+    font-weight: 600;
+}
+.empty-icon {
+    font-size: 32px;
+    color: #8EC5FC;
+    font-weight: 300;
+    margin: 5px 0;
+}
+.empty-hint {
+    font-size: 10px;
+    color: var(--text-color);
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+.type-empty:hover .empty-hint {
+    opacity: 0.6;
+}
+
 .sub-title {{ font-weight: 700; font-size: 13px; margin-bottom: 4px; }}
 .sub-meta {{ font-size: 11px; opacity: 0.9; }}
 .batch-badge {{
@@ -234,17 +273,108 @@ table.custom-grid {{ width: 100%; min-width: 1000px; border-collapse: separate; 
 }}
 .student-meta {{ font-size: 15px; color: var(--text-color); opacity: 0.7; font-weight: 500; }}
 
-/* DIALOG & BADGES */
+/* --- EXPANDER HEADER --- */
+[data-testid="stExpander"] summary p {{
+    background: -webkit-linear-gradient(45deg, #ff9a44, #fc6076);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    font-size: 18px !important;
+    font-weight: 800 !important;
+}}
+[data-testid="stExpander"] summary svg {{ fill: var(--text-color) !important; color: var(--text-color) !important; }}
+
+/* --- MODAL & VENUE CARDS --- */
 div[data-testid="stDialog"] {{
     background-color: var(--modal-bg) !important;
     color: var(--text-color) !important;
 }}
-.venue-badge {{
-    display: inline-block; padding: 8px 15px; margin: 5px; border-radius: 50px;
-    font-weight: 700; font-size: 14px;
-    background-color: var(--venue-badge-bg);
-    color: var(--venue-badge-text) !important;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.1); border: 1px solid rgba(128,128,128,0.1);
+
+.venue-card-row {{
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-top: 15px;
+}}
+
+.venue-card {{
+    background-color: var(--venue-card-bg);
+    border: 1px solid var(--venue-border);
+    border-radius: 16px;
+    padding: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.03);
+    transition: transform 0.2s;
+}}
+.venue-card:hover {{
+    transform: translateX(5px);
+    border-color: #6a11cb;
+}}
+
+.venue-left {{
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}}
+
+.venue-icon-box {{
+    width: 45px;
+    height: 45px;
+    background: linear-gradient(135deg, #6a11cb 0%, #a18cd1 100%);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    color: white;
+}}
+
+.venue-details {{
+    display: flex;
+    flex-direction: column;
+}}
+
+.venue-name {{
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text-color);
+}}
+
+.venue-type {{
+    font-size: 11px;
+    text-transform: uppercase;
+    color: var(--text-color);
+    opacity: 0.6;
+    letter-spacing: 0.5px;
+    font-weight: 600;
+}}
+
+.venue-extras {{
+    font-size: 12px;
+    color: var(--text-color);
+    opacity: 0.8;
+    margin-top: 4px;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}}
+
+.venue-capacity-badge {{
+    background-color: #f0f2f6;
+    color: #2c3e50;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 20px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}}
+/* Dark mode adjust for badge */
+[data-theme="dark"] .venue-capacity-badge {{
+    background-color: #333;
+    color: #fff;
 }}
 
 /* ALLOCATION TABLE (Restored) */
@@ -544,12 +674,19 @@ def render_grid(entries):
                 else:
                     html += f'<td {span}><div class="class-card filled" style="background:{grad}"><div class="batch-badge">{cell["Type"]}</div><div class="sub-title">{cell["Subject"]}</div><div class="sub-meta">📍 {cell["Venue"]}</div></div></td>'
             else:
-                html += f'<td><div class="class-card type-empty js-free-slot-trigger" data-day="{d}" data-time="{s}"></div></td>'
+                # NEW EMPTY SLOT DESIGN
+                html += f'''<td>
+                    <div class="type-empty js-free-slot-trigger" data-day="{d}" data-time="{s}">
+                        <div class="empty-title">Free Slot</div>
+                        <div class="empty-icon">+</div>
+                        <div class="empty-hint">Double click<br>or long press</div>
+                    </div>
+                </td>'''
         html += '</tr>'
     return html + '</tbody></table></div>'
 
 def render_subject_html(subjects, link_map):
-    # --- RESTORED SUBJECT UI ---
+    # RESTORED SUBJECT UI
     html_parts = ["""
     <div class="sub-alloc-wrapper"><table class="sub-alloc-table"><thead><tr><th style="width:40%">Subject Name</th><th style="width:20%">Batch</th><th style="width:20%">Division</th><th style="width:20%">Material</th></tr></thead><tbody>
     """]
@@ -693,21 +830,52 @@ if st.session_state.venue_bridge:
         # Calculate available venues
         free_venues_list = get_free_venues_at_slot(clicked_day, clicked_time, sched_df, all_venues_set)
         
+        # Determine End Time for Label
+        start_dt = datetime.strptime(clicked_time, "%H:%M")
+        end_dt = start_dt + timedelta(hours=1)
+        time_range = f"{clicked_time} - {end_dt.strftime('%H:%M')}"
+
         # Show Result Dialog
-        @st.dialog(f"Free Classrooms on {clicked_day} at {clicked_time}")
-        def show_free_venues(venues):
-            st.markdown(f"""<div style='text-align: center; margin-bottom: 20px;'><p style='font-size: 16px; opacity: 0.8;'>Here are the venues currently available during this time slot.</p></div>""", unsafe_allow_html=True)
+        @st.dialog("Available Classrooms")
+        def show_free_venues(venues, day, tr):
+            st.markdown(f"""
+            <div style='margin-bottom: 20px;'>
+                <p style='font-size: 16px; opacity: 0.8;'>
+                    Free slots on <span style="color:#6a11cb; font-weight:700">{day}</span> from <span style="background:#f0f2f6; padding:2px 6px; border-radius:4px; font-weight:600; color:#333">{tr}</span>
+                </p>
+            </div>
+            """, unsafe_allow_html=True)
+            
             if venues:
-                badges_html = "".join([f'<span class="venue-badge">{v}</span>' for v in venues])
-                st.markdown(f"<div style='text-align: center;'>{badges_html}</div>", unsafe_allow_html=True)
+                cards_html = '<div class="venue-card-row">'
+                for v in venues:
+                    # Mock details based on venue name since excel lacks this metadata
+                    v_type = "LECTURE HALL" if "L" in v or "A" in v else "LAB" if "LAB" in v.upper() else "TUTORIAL ROOM"
+                    capacity = "60" if v_type == "LECTURE HALL" else "30"
+                    amenity = "📽️ Projector" if v_type == "LECTURE HALL" else "💻 Computers" if v_type == "LAB" else "📝 Whiteboard"
+                    
+                    cards_html += f"""
+                    <div class="venue-card">
+                       <div class="venue-left">
+                           <div class="venue-icon-box">📍</div>
+                           <div class="venue-details">
+                              <div class="venue-name">{v}</div>
+                              <div class="venue-type">{v_type}</div>
+                              <div class="venue-extras">{amenity}</div>
+                           </div>
+                       </div>
+                       <div class="venue-capacity-badge">👥 {capacity}</div>
+                    </div>
+                    """
+                cards_html += '</div>'
+                st.markdown(cards_html, unsafe_allow_html=True)
             else:
                 st.warning("No free classrooms found for this slot.")
         
-        show_free_venues(free_venues_list)
+        show_free_venues(free_venues_list, clicked_day, time_range)
     except: pass
     
     # CRITICAL: Clear the state here so the input renders empty below.
-    # This prevents the "StreamlitAPIException" by ensuring we don't modify state after widget creation.
     st.session_state.venue_bridge = ""
 
 
@@ -892,6 +1060,7 @@ components.html("""
             // --- MOBILE LONG-PRESS ---
             let pressTimer;
             slot.addEventListener('touchstart', function(e) {
+                // Prevent interfering with multi-touch gestures
                 if (e.touches.length === 1) { 
                     pressTimer = setTimeout(() => { 
                         triggerStreamlitUpdate(this.dataset.day, this.dataset.time); 
