@@ -20,7 +20,7 @@ st.set_page_config(page_title="Student Timetable", page_icon="✨", layout="wide
 if 'theme' not in st.session_state:
     st.session_state.theme = 'light'
 
-# Initialize state for venue bridge
+# Initialize Bridge State for JS Communication
 if 'venue_bridge' not in st.session_state:
     st.session_state.venue_bridge = ""
 
@@ -94,12 +94,42 @@ html, body, [class*="css"], .stMarkdown, div, span, p, h1, h2, h3, h4, h5, h6 {{
     color: var(--text-color);
 }}
 
-/* --- HIDE THE BRIDGE INPUT (Corrected Syntax) --- */
-div[data-testid="stTextInput"]:has(input[aria-label="internal_bridge"]) {{
-    display: none;
+/* --- SIDEBAR TOGGLE BUTTON --- */
+.theme-btn {{
+    border: 1px solid var(--text-color);
+    background: transparent;
+    color: var(--text-color);
+    padding: 5px 10px;
+    border-radius: 15px;
+    cursor: pointer;
+    font-size: 12px;
+    margin-bottom: 10px;
 }}
 
-/* --- BUTTONS & INPUTS --- */
+/* --- FIXES FOR VISIBILITY --- */
+[data-testid="stSidebar"] p, [data-testid="stSidebar"] span, [data-testid="stSidebar"] div, [data-testid="stSidebar"] h1, [data-testid="stSidebar"] h2, [data-testid="stSidebar"] h3 {{
+    color: var(--text-color) !important;
+}}
+
+div[data-baseweb="popover"], div[data-baseweb="tooltip"] {{
+    background-color: var(--card-bg) !important;
+    color: var(--text-color) !important;
+    border: 1px solid rgba(128, 128, 128, 0.2) !important;
+    box-shadow: 0 4px 15px var(--card-shadow) !important;
+}}
+
+div[data-baseweb="input"] {{
+    border: none;
+    border-radius: 50px !important;
+    background-color: #262730; 
+    padding: 8px 20px;
+    box-shadow: inset 0 2px 4px rgba(0,0,0,0.5);
+    color: white !important;
+}}
+div[data-baseweb="input"] input {{ color: white !important; caret-color: white; }}
+div[data-testid="stDateInput"] input {{ color: #ffffff !important; font-weight: 600; }}
+
+/* --- BUTTONS --- */
 div.stButton > button {{
     width: 100% !important;
     height: 80px !important;       
@@ -132,17 +162,6 @@ div.stButton > button[kind="secondary"] {{
     font-weight: 600 !important;
 }}
 div.stButton > button[kind="secondary"]:hover {{ background-color: var(--table-row-hover) !important; }}
-
-div[data-baseweb="input"] {{
-    border: none;
-    border-radius: 50px !important;
-    background-color: #262730; 
-    padding: 8px 20px;
-    box-shadow: inset 0 2px 4px rgba(0,0,0,0.5);
-    color: white !important;
-}}
-div[data-baseweb="input"] input {{ color: white !important; caret-color: white; }}
-div[data-testid="stDateInput"] input {{ color: #ffffff !important; font-weight: 600; }}
 
 /* --- TIMETABLE GRID --- */
 .timetable-wrapper {{ overflow-x: auto; padding: 20px 5px 40px 5px; }}
@@ -191,11 +210,25 @@ table.custom-grid {{ width: 100%; min-width: 1000px; border-collapse: separate; 
     margin-bottom: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); color: #2c3e50 !important;
 }}
 
-/* OFFSET LECTURES */
-.offset-wrapper {{ height: 100%; display: flex; flex-direction: column; }}
-.offset-spacer {{ flex: 0 0 25%; min-height: 25%; }}
-.offset-card-container {{ flex: 1; height: 100%; position: relative; }}
-.class-card.offset-style {{ border-radius: 18px; height: 100% !important; }}
+/* --- NEW CSS FOR 1.5 HOUR / OFFSET LECTURES --- */
+.offset-wrapper {{
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}}
+.offset-spacer {{
+    flex: 0 0 25%; 
+    min-height: 25%; 
+}}
+.offset-card-container {{
+    flex: 1; 
+    height: 100%;
+    position: relative;
+}}
+.class-card.offset-style {{
+    border-radius: 18px;
+    height: 100% !important;
+}}
 
 /* ATTENDANCE CARDS */
 .metric-card {{
@@ -231,17 +264,39 @@ table.custom-grid {{ width: 100%; min-width: 1000px; border-collapse: separate; 
 }}
 .student-meta {{ font-size: 15px; color: var(--text-color); opacity: 0.7; font-weight: 500; }}
 
-/* DIALOG & BADGES */
+/* --- EXPANDER HEADER --- */
+[data-testid="stExpander"] summary p {{
+    background: -webkit-linear-gradient(45deg, #ff9a44, #fc6076);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    font-size: 18px !important;
+    font-weight: 800 !important;
+}}
+[data-testid="stExpander"] summary svg {{ fill: var(--text-color) !important; color: var(--text-color) !important; }}
+
+/* --- MODAL & VENUE BADGES --- */
 div[data-testid="stDialog"] {{
     background-color: var(--modal-bg) !important;
     color: var(--text-color) !important;
 }}
 .venue-badge {{
-    display: inline-block; padding: 8px 15px; margin: 5px; border-radius: 50px;
-    font-weight: 700; font-size: 14px;
+    display: inline-block;
+    padding: 8px 15px;
+    margin: 5px;
+    border-radius: 50px;
+    font-weight: 700;
+    font-size: 14px;
     background-color: var(--venue-badge-bg);
     color: var(--venue-badge-text) !important;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.1); border: 1px solid rgba(128,128,128,0.1);
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    border: 1px solid rgba(128,128,128,0.1);
+}}
+
+/* --- HIDE THE BRIDGE INPUT (Specific Selector) --- */
+div[data-testid="stTextInput"]:has(input[aria-label="internal_bridge"]) {{
+    display: none !important;
+    height: 0px !important;
+    opacity: 0 !important;
 }}
 </style>
 """, unsafe_allow_html=True)
@@ -537,7 +592,18 @@ def render_grid(entries):
     return html + '</tbody></table></div>'
 
 def render_subject_html(subjects, link_map):
-    html_parts = ["""<div class="sub-alloc-wrapper"><table class="sub-alloc-table"><thead><tr><th style="width:40%">Subject Name</th><th style="width:20%">Batch</th><th style="width:20%">Division</th><th style="width:20%">Material</th></tr></thead><tbody>"""]
+    html_parts = ["""
+    <style>
+    .sub-alloc-wrapper { font-family: 'Poppins', sans-serif; margin-top: 10px; border-radius: 12px; overflow-x: auto; border: none; box-shadow: 0 4px 20px var(--card-shadow); background: var(--card-bg); }
+    table.sub-alloc-table { width: 100%; min-width: 600px; border-collapse: collapse; background: var(--card-bg); }
+    .sub-alloc-table thead th { background: linear-gradient(90deg, #a18cd1 0%, #fbc2eb 100%); color: white; padding: 18px; font-size: 17px; font-weight: 700; text-align: left; white-space: nowrap; }
+    .sub-alloc-table tbody td { padding: 16px; font-size: 16px; color: var(--text-color); border-bottom: 1px solid rgba(128,128,128,0.1); background: var(--card-bg); vertical-align: middle; transition: all 0.2s; white-space: nowrap; }
+    .sub-alloc-table tbody tr:hover td { background-color: var(--table-row-hover); transform: scale(1.005); color: #6a11cb; cursor: default; }
+    .drive-btn { background: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%); color: white !important; padding: 8px 16px; border-radius: 50px; text-decoration: none; font-size: 13px; font-weight: 600; display: inline-block; transition: 0.2s; }
+    .drive-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 15px rgba(37, 117, 252, 0.3); }
+    </style>
+    <div class="sub-alloc-wrapper"><table class="sub-alloc-table"><thead><tr><th style="width:40%">Subject Name</th><th style="width:20%">Batch</th><th style="width:20%">Division</th><th style="width:20%">Material</th></tr></thead><tbody>
+    """]
     for sub in subjects:
         link = link_map.get(clean_text(sub.get('Subject')), "#")
         link_html = f'<a href="{link}" target="_blank" class="drive-btn">📂 Open Drive</a>' if link != "#" else "<span style='color:#aaa'>No Link</span>"
@@ -668,11 +734,17 @@ with toggle_col:
     if st.button(icon, on_click=toggle_theme, key="theme_toggle", help="Toggle Dark Mode"): pass
 
 # --- BRIDGE LOGIC (MOVED TO TOP TO PREVENT CRASH) ---
+# Logic: Checks if JS sent a value via the bridge input.
+# If yes, calculate free venues, show modal, and clear state to prevent loops.
 if st.session_state.venue_bridge:
     try:
+        # Data format: "Day|Time" (e.g. "Monday|10:30")
         clicked_day, clicked_time = st.session_state.venue_bridge.split('|')
+        
+        # Calculate available venues
         free_venues_list = get_free_venues_at_slot(clicked_day, clicked_time, sched_df, all_venues_set)
         
+        # Show Result Dialog
         @st.dialog(f"Free Classrooms on {clicked_day} at {clicked_time}")
         def show_free_venues(venues):
             st.markdown(f"""<div style='text-align: center; margin-bottom: 20px;'><p style='font-size: 16px; opacity: 0.8;'>Here are the venues currently available during this time slot.</p></div>""", unsafe_allow_html=True)
@@ -681,14 +753,13 @@ if st.session_state.venue_bridge:
                 st.markdown(f"<div style='text-align: center;'>{badges_html}</div>", unsafe_allow_html=True)
             else:
                 st.warning("No free classrooms found for this slot.")
+        
         show_free_venues(free_venues_list)
     except: pass
     
-    # Clear state immediately so the input can be reset below without error
+    # CRITICAL: Clear the state here so the input renders empty below.
+    # This prevents the "StreamlitAPIException" by ensuring we don't modify state after widget creation.
     st.session_state.venue_bridge = ""
-
-# Hidden bridge input - Now it renders with an empty value safely
-st.text_input("internal_bridge", key="venue_bridge", label_visibility="collapsed")
 
 
 if not sub_dfs or sched_df is None:
@@ -844,6 +915,10 @@ st.markdown(f"""
     Student Portal © 2026 • Built by <span style="color:#6a11cb; font-weight:700">IRONDEM2921 [AIML]</span>
 </div>
 """, unsafe_allow_html=True)
+
+# --- BRIDGE INPUT (Rendered Last to Avoid Crash) ---
+# This input receives the JS data but is kept invisible via CSS
+st.text_input("internal_bridge", key="venue_bridge", label_visibility="collapsed")
 
 # --- JS INJECTION ---
 components.html("""
