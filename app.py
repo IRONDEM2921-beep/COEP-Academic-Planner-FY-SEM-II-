@@ -208,12 +208,7 @@ table.custom-grid {{ width: 100%; min-width: 1000px; border-collapse: separate; 
     display: flex;
     flex-direction: column;
 }}
-/* Logic for 25%: 
-   A 1.5h lecture spans 2 grid cells (2 hours total visual space).
-   1.5h / 2h = 75% filled.
-   Empty space = 25%.
-   So the spacer is 25% height.
-*/
+/* Spacer = 25% height (30 mins of the 2-hour spanned block) */
 .offset-spacer {{
     flex: 0 0 25%; 
     min-height: 25%; 
@@ -441,7 +436,8 @@ def generate_master_ics(weekly_schedule, semester_end_date):
                 start_h += 12
 
             dt_start = datetime.combine(start_date, datetime.min.time()).replace(hour=start_h, minute=start_m)
-            dt_end = dt_start + timedelta(hours=cls.get('Duration', 1)) # Note: Duration is row_span here, technically incorrect for 1.5h but acceptable for ICS approximation or needs exact float duration passed
+            # Use a rough int duration for ICS block logic
+            dt_end = dt_start + timedelta(hours=cls.get('Duration', 1)) 
             
             fmt = "%Y%m%dT%H%M%S"
             until_str = semester_end_date.strftime("%Y%m%dT235959")
@@ -771,16 +767,24 @@ def render_game_html():
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
     
-    const GRAVITY = 0.375; const JUMP_FORCE = -13.81; const MOVE_SPEED = 8.12;
-    const GAME_W = 400; const GAME_H = 600;
+    // --- PHYSICS CONSTANTS (Tuned for 60 FPS) ---
+    const GRAVITY = 0.375; 
+    const JUMP_FORCE = -13.81; 
+    const MOVE_SPEED = 8.12;
+    const GAME_W = 400; 
+    const GAME_H = 600;
     
+    // --- FPS CONTROL VARIABLES ---
+    let lastTime = 0;
+    const targetFPS = 60;
+    const frameInterval = 1000 / targetFPS; 
+
     let platforms = [], brokenParts = [], score = 0;
     let highScore = localStorage.getItem('doodleHighScore') || 0;
     let gameRunning = false, isGameOverAnimating = false;
     const doodler = {{ x: GAME_W / 2 - 20, y: GAME_H - 150, w: 60, h: 60, vx: 0, vy: 0, dir: 1 }};
     const keys = {{ left: false, right: false }};
     
-    // --- CONTROLS ---
     window.addEventListener('keydown', e => {{ if(e.key==="ArrowLeft") keys.left=true; if(e.key==="ArrowRight") keys.right=true; }});
     window.addEventListener('keyup', e => {{ if(e.key==="ArrowLeft") keys.left=false; if(e.key==="ArrowRight") keys.right=false; }});
 
@@ -818,7 +822,6 @@ def render_game_html():
         platforms.push(createPlatform(Math.random()*(GAME_W-60), y, type));
     }}
     function update() {{
-        if (!gameRunning) return;
         if (isGameOverAnimating) {{
             doodler.vy += 0.0575; if (doodler.vy > 4.6) doodler.vy = 4.6;
             doodler.y += doodler.vy; doodler.x += Math.sin(doodler.y * 0.02) * 1.5;
@@ -925,9 +928,26 @@ def render_game_html():
         canvas.style.pointerEvents = 'auto';
         
         isGameOverAnimating = false; init();
-        if (!gameRunning) {{ gameRunning = true; requestAnimationFrame(loop); }}
+        if (!gameRunning) {{ 
+            gameRunning = true; 
+            lastTime = performance.now();
+            requestAnimationFrame(loop); 
+        }}
     }}
-    function loop() {{ if(gameRunning) {{ update(); draw(); requestAnimationFrame(loop); }} }}
+    
+    // --- UPDATED LOOP WITH FPS THROTTLING ---
+    function loop(currentTime) {{
+        if (!gameRunning) return;
+        requestAnimationFrame(loop);
+
+        const elapsed = currentTime - lastTime;
+
+        if (elapsed > frameInterval) {{
+            lastTime = currentTime - (elapsed % frameInterval);
+            update();
+            draw();
+        }}
+    }}
 </script>
 </body>
 </html>
