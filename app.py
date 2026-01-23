@@ -20,6 +20,10 @@ st.set_page_config(page_title="Student Timetable", page_icon="✨", layout="wide
 if 'theme' not in st.session_state:
     st.session_state.theme = 'light'
 
+# Initialize state for venue bridge if not present
+if 'venue_bridge' not in st.session_state:
+    st.session_state.venue_bridge = ""
+
 def toggle_theme():
     st.session_state.theme = 'dark' if st.session_state.theme == 'light' else 'light'
 
@@ -45,7 +49,10 @@ light_theme = {
     "secondary_btn_bg": "#ffffff",
     "secondary_btn_text": "#6a11cb",
     "game_bg": "#fcfcf4",
-    "game_grid": "#e0dacc"
+    "game_grid": "#e0dacc",
+    "modal_bg": "#ffffff",
+    "venue_badge_bg": "#f0f2f6",
+    "venue_badge_text": "#2c3e50"
 }
 
 dark_theme = {
@@ -57,7 +64,10 @@ dark_theme = {
     "secondary_btn_bg": "#1e1e1e",
     "secondary_btn_text": "#a18cd1",
     "game_bg": "#1a1a1a",
-    "game_grid": "#333333"
+    "game_grid": "#333333",
+    "modal_bg": "#262730",
+    "venue_badge_bg": "#363945",
+    "venue_badge_text": "#ffffff"
 }
 
 # Select current palette
@@ -77,6 +87,9 @@ st.markdown(f"""
     --table-row-hover: {current_theme['table_row_hover']};
     --sec-btn-bg: {current_theme['secondary_btn_bg']};
     --sec-btn-text: {current_theme['secondary_btn_text']};
+    --modal-bg: {current_theme['modal_bg']};
+    --venue-badge-bg: {current_theme['venue_badge_bg']};
+    --venue-badge-text: {current_theme['venue_badge_text']};
 }}
 
 /* BACKGROUND & GLOBAL FONT */
@@ -193,7 +206,8 @@ table.custom-grid {{ width: 100%; min-width: 1000px; border-collapse: separate; 
     color: #2c3e50 !important; border: none !important; box-shadow: none !important;
 }}
 .class-card.filled:hover {{ transform: translateY(-5px) scale(1.03); box-shadow: 0 15px 30px rgba(0,0,0,0.15) !important; z-index: 100; }}
-.type-empty {{ background: var(--card-bg); border: 2px dashed rgba(160, 160, 200, 0.2); border-radius: 18px; }}
+.type-empty {{ background: var(--card-bg); border: 2px dashed rgba(160, 160, 200, 0.2); border-radius: 18px; cursor: pointer; }}
+.type-empty:hover {{ border-color: #8EC5FC; background: var(--table-row-hover); }}
 .sub-title {{ font-weight: 700; font-size: 13px; margin-bottom: 4px; }}
 .sub-meta {{ font-size: 11px; opacity: 0.9; }}
 .batch-badge {{
@@ -266,6 +280,28 @@ table.custom-grid {{ width: 100%; min-width: 1000px; border-collapse: separate; 
     font-weight: 800 !important;
 }}
 [data-testid="stExpander"] summary svg {{ fill: var(--text-color) !important; color: var(--text-color) !important; }}
+
+/* --- MODAL & VENUE BADGES --- */
+div[data-testid="stDialog"] {{
+    background-color: var(--modal-bg) !important;
+    color: var(--text-color) !important;
+}}
+.venue-badge {{
+    display: inline-block;
+    padding: 8px 15px;
+    margin: 5px;
+    border-radius: 50px;
+    font-weight: 700;
+    font-size: 14px;
+    background-color: var(--venue-badge-bg);
+    color: var(--venue-badge-text) !important;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    border: 1px solid rgba(128,128,128,0.1);
+}}
+/* Hide the bridge input */
+.venue-bridge-hidden {
+    display: none;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -374,6 +410,62 @@ def map_to_slot(time_str, slots):
         return best
     except: pass
     return None
+
+# --- VENUE HELPER FUNCTIONS ---
+@st.cache_data
+def get_all_venues(sched_df):
+    if sched_df is None: return set()
+    cols = sched_df.columns
+    t_venue_col = next((c for c in cols if "Venue" in c), None)
+    if not t_venue_col: return set()
+    
+    venues = set()
+    for _, row in sched_df.iterrows():
+        v = str(row[t_venue_col]).strip()
+        if v and v.lower() not in ['nan', '-', '', 'online']:
+            venues.add(v)
+    return venues
+
+def get_free_venues_at_slot(day, slot_time_str, sched_df, all_venues):
+    if sched_df is None or not all_venues: return []
+    
+    cols = sched_df.columns
+    t_day_col = next((c for c in cols if "Day" in c), None)
+    t_time_col = next((c for c in cols if "Time" in c), None)
+    t_venue_col = next((c for c in cols if "Venue" in c), None)
+    
+    if not (t_day_col and t_time_col and t_venue_col): return []
+
+    # Filter by day
+    day_schedule = sched_df[sched_df[t_day_col].astype(str).str.title().str.strip() == day]
+    
+    occupied_venues = set()
+    target_dt = datetime.strptime(slot_time_str, "%H:%M")
+    # Define the end of the slot (assuming 1 hour slots for checking overlap)
+    target_end_dt = target_dt + timedelta(minutes=59) 
+
+    for _, row in day_schedule.iterrows():
+        start_str, dur_hours = parse_time(row[t_time_col])
+        venue = str(row[t_venue_col]).strip()
+        
+        if start_str and venue and venue.lower() not in ['nan', '-', '']:
+            try:
+                class_start_dt = datetime.strptime(start_str, "%H:%M")
+                # Fix PM crossover for start times like 1:30, 2:30 etc.
+                if class_start_dt.hour < 8:
+                     class_start_dt += timedelta(hours=12)
+                     
+                class_end_dt = class_start_dt + timedelta(minutes=int(dur_hours * 60))
+                
+                # Check for overlap: StartA < EndB AND EndA > StartB
+                if class_start_dt < target_end_dt and class_end_dt > target_dt:
+                    occupied_venues.add(venue)
+            except:
+                continue
+                
+    free_venues = list(all_venues - occupied_venues)
+    free_venues.sort()
+    return free_venues
 
 # --- GOOGLE SHEETS PERSISTENCE ---
 def get_google_client():
@@ -614,7 +706,8 @@ def render_grid(entries):
                     # Normal Render
                     html += f'<td {span}><div class="class-card filled" style="background:{grad}"><div class="batch-badge">{cell["Type"]}</div><div class="sub-title">{cell["Subject"]}</div><div class="sub-meta">📍 {cell["Venue"]}</div></div></td>'
             else:
-                html += '<td><div class="class-card type-empty"></div></td>'
+                # MODIFIED: Added js-free-slot-trigger class and data attributes
+                html += f'<td><div class="class-card type-empty js-free-slot-trigger" data-day="{d}" data-time="{s}"></div></td>'
         html += '</tr>'
     return html + '</tbody></table></div>'
 
@@ -965,6 +1058,9 @@ if 'attendance' not in st.session_state:
 
 sub_dfs, sched_df, link_map = load_data()
 
+# Load all venues once
+all_venues_set = get_all_venues(sched_df)
+
 # HEADER with Theme Toggle
 h1_col, toggle_col = st.columns([8, 1])
 with h1_col:
@@ -980,6 +1076,12 @@ with toggle_col:
     st.write("") 
     icon = "🌙" if st.session_state.theme == "light" else "☀️"
     if st.button(icon, on_click=toggle_theme, key="theme_toggle", help="Toggle Dark Mode"): pass
+
+# --- HIDDEN BRIDGE WIDGET FOR JS COMMUNICATION ---
+# This hidden input will receive data from JavaScript when an empty slot is clicked.
+st.text_input("", key="venue_bridge", label_visibility="collapsed")
+# Apply CSS class to hide it completely
+st.markdown('<style>div[data-testid="stTextInput"] has-venue-bridge-hidden { display: none; }</style>', unsafe_allow_html=True)
 
 if not sub_dfs or sched_df is None:
     st.error(f"Missing files in '{DATA_FOLDER}'.")
@@ -1021,6 +1123,7 @@ else:
                     st.cache_data.clear()
                     st.rerun()
                 
+                # Render the grid with potential JS triggers on empty cells
                 st.markdown(render_grid(table), unsafe_allow_html=True)
             else:
                 st.warning("No schedule found.")
@@ -1125,6 +1228,97 @@ else:
             if st.button("Try Again"):
                 st.session_state.mis_no = ""
                 st.rerun()
+
+# --- CHECK FOR VENUE BRIDGE TRIGGER ---
+# This block checks if the hidden input was updated by JS.
+# If so, it displays the free venues in a modal dialog.
+if st.session_state.venue_bridge:
+    try:
+        # The JS sends data formatted as "Day|Time"
+        clicked_day, clicked_time = st.session_state.venue_bridge.split('|')
+        
+        # Calculate free venues for that specific slot
+        free_venues_list = get_free_venues_at_slot(clicked_day, clicked_time, sched_df, all_venues_set)
+        
+        # Use st.dialog for the pop-up modal
+        @st.dialog(f"Free Classrooms on {clicked_day} at {clicked_time}")
+        def show_free_venues(venues):
+            st.markdown(f"""
+            <div style='text-align: center; margin-bottom: 20px;'>
+                <p style='font-size: 16px; opacity: 0.8;'>Here are the venues currently available during this time slot.</p>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            if venues:
+                # Display venues as elegant badges
+                badges_html = "".join([f'<span class="venue-badge">{v}</span>' for v in venues])
+                st.markdown(f"<div style='text-align: center;'>{badges_html}</div>", unsafe_allow_html=True)
+            else:
+                st.warning("No free classrooms found for this slot.")
+                
+        show_free_venues(free_venues_list)
+
+    except Exception as e:
+        # Fail silently if the bridge data is malformed
+        pass
+    
+    # Reset the bridge state so it can be triggered again
+    st.session_state.venue_bridge = ""
+
+# --- JAVASCRIPT INJECTION FOR GRID CLICK DETECTION ---
+# This script attaches to the empty slots and communicates with Streamlit via the hidden input.
+# It handles double-click for desktops and simulates long-press for mobile.
+components.html("""
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const emptySlots = document.querySelectorAll('.js-free-slot-trigger');
+        let pressTimer;
+
+        function triggerStreamlitUpdate(day, time) {
+            // Find the hidden Streamlit input. This is a brittle selector but necessary for the hack.
+            // It looks for the input field within the div that has the matching label (which is hidden).
+            const bridgeInput = window.parent.document.querySelector('div[data-testid="stTextInput"] input');
+            
+            if (bridgeInput) {
+                // Set the value to "Day|Time" format
+                const newValue = `${day}|${time}`;
+                // React requires a specific way to set values on controlled inputs
+                const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
+                nativeInputValueSetter.call(bridgeInput, newValue);
+                
+                // Dispatch input and change events so Streamlit detects it
+                bridgeInput.dispatchEvent(new Event('input', { bubbles: true }));
+                bridgeInput.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+        }
+
+        emptySlots.forEach(slot => {
+            // --- DESKTOP DOUBLE-CLICK ---
+            slot.addEventListener('dblclick', function() {
+                triggerStreamlitUpdate(this.dataset.day, this.dataset.time);
+            });
+
+            // --- MOBILE LONG-PRESS SIMULATION ---
+            slot.addEventListener('touchstart', function(e) {
+                 // Prevent default to avoid scrolling/context menu interference on long press
+                if (e.touches.length === 1) {
+                     pressTimer = setTimeout(() => {
+                        triggerStreamlitUpdate(this.dataset.day, this.dataset.time);
+                    }, 800); // 800ms for long press
+                }
+            });
+
+            slot.addEventListener('touchend', function() {
+                clearTimeout(pressTimer); // Cancel if finger is lifted early
+            });
+            
+            slot.addEventListener('touchmove', function() {
+                clearTimeout(pressTimer); // Cancel if finger moves
+            });
+        });
+    });
+</script>
+""", height=0, width=0)
 
 # FOOTER
 footer_color = "var(--footer-color)"
