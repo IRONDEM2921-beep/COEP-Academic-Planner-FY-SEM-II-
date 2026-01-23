@@ -21,13 +21,13 @@ st.set_page_config(page_title="Student Timetable", page_icon="✨", layout="wide
 if 'theme' not in st.session_state:
     st.session_state.theme = 'light'
 
-# Initialize Bridge & Modal State
+# Initialize Bridge State for JS Communication
 if 'venue_bridge' not in st.session_state:
     st.session_state.venue_bridge = ""
 if 'last_processed_bridge' not in st.session_state:
     st.session_state.last_processed_bridge = ""
 if 'active_slot_data' not in st.session_state:
-    st.session_state.active_slot_data = None # Stores {day, time, venues}
+    st.session_state.active_slot_data = None
 
 def toggle_theme():
     st.session_state.theme = 'dark' if st.session_state.theme == 'light' else 'light'
@@ -79,6 +79,7 @@ st.markdown(f"""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap');
 
+/* --- CSS VARIABLES --- */
 :root {{
     --bg-color: {current_theme['bg_color']};
     --text-color: {current_theme['text_color']};
@@ -92,6 +93,7 @@ st.markdown(f"""
     --venue-border: {current_theme['venue_border']};
 }}
 
+/* BACKGROUND & GLOBAL FONT */
 .stApp {{ background-color: var(--bg-color); }}
 
 html, body, [class*="css"], .stMarkdown, div, span, p, h1, h2, h3, h4, h5, h6 {{
@@ -99,28 +101,97 @@ html, body, [class*="css"], .stMarkdown, div, span, p, h1, h2, h3, h4, h5, h6 {{
     color: var(--text-color);
 }}
 
-/* --- HIDE THE BRIDGE INPUT SAFELY --- */
-div[data-testid="stTextInput"]:has(input[aria-label="venue_bridge_input"]) {{
-    opacity: 0;
-    height: 0px;
-    width: 0px;
-    overflow: hidden;
-    margin: 0;
-    padding: 0;
-    position: absolute;
-    z-index: -1;
+/* --- SIDEBAR TOGGLE BUTTON --- */
+.theme-btn {{
+    border: 1px solid var(--text-color);
+    background: transparent;
+    color: var(--text-color);
+    padding: 5px 10px;
+    border-radius: 15px;
+    cursor: pointer;
+    font-size: 12px;
+    margin-bottom: 10px;
 }}
+
+/* --- FIX 1: SIDEBAR TEXT VISIBILITY --- */
+[data-testid="stSidebar"] p, [data-testid="stSidebar"] span, [data-testid="stSidebar"] div, [data-testid="stSidebar"] h1, [data-testid="stSidebar"] h2, [data-testid="stSidebar"] h3 {{
+    color: var(--text-color) !important;
+}}
+
+/* --- FIX 2: TOOLTIP VISIBILITY --- */
+div[data-baseweb="popover"], div[data-baseweb="tooltip"] {{
+    background-color: var(--card-bg) !important;
+    color: var(--text-color) !important;
+    border: 1px solid rgba(128, 128, 128, 0.2) !important;
+    box-shadow: 0 4px 15px var(--card-shadow) !important;
+}}
+div[data-baseweb="popover"] > div, div[data-baseweb="tooltip"] > div {{
+    background-color: transparent !important;
+    color: var(--text-color) !important;
+}}
+
+/* --- FIX: SIDEBAR DOWNLOAD BUTTON VISIBILITY --- */
+[data-testid="stSidebar"] .stDownloadButton button {{
+    border: 1px solid rgba(255,255,255,0.3) !important;
+    background: transparent !important;
+}}
+[data-testid="stSidebar"] .stDownloadButton button * {{
+    background: linear-gradient(90deg, #E0C3FC 0%, #8EC5FC 100%) !important;
+    -webkit-background-clip: text !important;
+    -webkit-text-fill-color: transparent !important;
+    font-weight: 700 !important;
+    font-size: 15px !important;
+}}
+[data-testid="stSidebar"] .stDownloadButton button:hover {{
+    border-color: #8EC5FC !important;
+    transform: translateY(-2px);
+}}
+
+/* --- INPUT BOXES --- */
+div[data-baseweb="input"] {{
+    border: none;
+    border-radius: 50px !important;
+    background-color: #262730; 
+    padding: 8px 20px;
+    box-shadow: inset 0 2px 4px rgba(0,0,0,0.5);
+    color: white !important;
+}}
+div[data-baseweb="input"] input {{ color: white !important; caret-color: white; }}
+div[data-testid="stDateInput"] input {{ color: #ffffff !important; font-weight: 600; }}
 
 /* --- BUTTONS --- */
 div.stButton > button {{
     width: 100% !important;
-    height: auto !important;       
-    min-height: 50px !important;
+    height: 80px !important;        
+    min-height: 80px !important;
     white-space: normal !important; 
-    padding: 10px !important;
-    border-radius: 12px !important;
+    line-height: 1.2 !important;
+    padding: 8px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    border-radius: 15px !important;
+    font-size: 13px !important;       
+    text-align: center !important;
+}}
+
+div.stButton > button[kind="primary"] {{
+    background: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%) !important;
+    border: none !important; 
+    font-weight: 700 !important;
+    box-shadow: 0 4px 10px rgba(106, 17, 203, 0.2); 
+    transition: transform 0.2s;
+}}
+div.stButton > button[kind="primary"] * {{ color: #ffffff !important; }}
+div.stButton > button[kind="primary"]:hover {{ transform: translateY(-2px); box-shadow: 0 6px 15px rgba(106, 17, 203, 0.3); }}
+
+div.stButton > button[kind="secondary"] {{
+    background-color: var(--sec-btn-bg) !important; 
+    color: var(--sec-btn-text) !important; 
+    border: 2px solid #6a11cb !important; 
     font-weight: 600 !important;
 }}
+div.stButton > button[kind="secondary"]:hover {{ background-color: var(--table-row-hover) !important; }}
 
 /* --- TIMETABLE GRID --- */
 .timetable-wrapper {{ overflow-x: auto; padding: 20px 5px 40px 5px; }}
@@ -130,6 +201,7 @@ table.custom-grid {{ width: 100%; min-width: 1000px; border-collapse: separate; 
     background: linear-gradient(90deg, #8EC5FC 0%, #E0C3FC 100%);
     color: #2c3e50; font-weight: 800; padding: 15px; border-radius: 15px;
     text-align: center; font-size: 18px; box-shadow: 0 4px 10px rgba(142, 197, 252, 0.4); border: none;
+    text-transform: uppercase; letter-spacing: 1px;
 }}
 .custom-grid th:first-child {{ background: transparent; box-shadow: none; width: 140px; color: var(--text-color); }}
 
@@ -137,73 +209,119 @@ table.custom-grid {{ width: 100%; min-width: 1000px; border-collapse: separate; 
     background: linear-gradient(90deg, #8EC5FC 0%, #E0C3FC 100%);
     border-radius: 15px; font-size: 14px; font-weight: 800; color: #2c3e50;
     text-align: center; vertical-align: middle; box-shadow: 0 4px 10px rgba(142, 197, 252, 0.4);
-    min-width: 140px;
+    min-width: 140px; white-space: nowrap;
 }}
 .custom-grid td {{ vertical-align: top; height: 110px; padding: 0; border: none; }}
 .time-label {{ color: #2c3e50 !important; }}
 
-/* CARD STYLES */
+/* CARD & HOVER EFFECTS */
 .class-card {{
     height: 100%; width: 100%; padding: 12px; box-sizing: border-box;
     display: flex; flex-direction: column; justify-content: center;
-    border-radius: 18px; transition: all 0.3s;
-    cursor: default;
+    border-radius: 18px; transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+    position: relative; cursor: default;
 }}
 .class-card.filled {{
     border: 1px solid rgba(255,255,255,0.4) !important;
     box-shadow: 0 4px 6px rgba(0,0,0,0.05) !important;
     color: #2c3e50 !important;
 }}
+.class-card.filled div, .class-card.filled span, .class-card.filled p {{
+    color: #2c3e50 !important; border: none !important; box-shadow: none !important;
+}}
 .class-card.filled:hover {{ transform: translateY(-5px) scale(1.03); box-shadow: 0 15px 30px rgba(0,0,0,0.15) !important; z-index: 100; }}
 
-/* --- NEW EMPTY SLOT DESIGN (Fixed) --- */
+/* --- NEW EMPTY SLOT / BUTTON STYLE --- */
 .type-empty {{ 
     background: var(--card-bg); 
     border: 2px dashed rgba(160, 160, 200, 0.3); 
     border-radius: 18px; 
     cursor: pointer; 
-    display: flex;
-    flex-direction: column;
-    align-items: center;
+    display: flex; 
+    flex-direction: column; 
+    align-items: center; 
     justify-content: center;
     text-align: center;
-    transition: all 0.1s;
-    
-    /* Disable Text Selection */
-    -webkit-user-select: none; 
-    -moz-user-select: none;    
-    -ms-user-select: none;     
-    user-select: none;         
+    transition: all 0.2s;
+    /* Prevent text selection so double click works properly */
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
 }}
-.type-empty:hover {{ 
-    border-color: #8EC5FC; 
-    background: var(--table-row-hover); 
+.type-empty:hover {{
+    border-color: #8EC5FC;
+    background: var(--table-row-hover);
     transform: scale(0.98);
 }}
 .type-empty:active {{
-    transform: scale(0.96);
-    background-color: rgba(142, 197, 252, 0.2);
-    border-color: #6a11cb;
+    transform: scale(0.95);
+    background-color: rgba(142, 197, 252, 0.1);
+}}
+.empty-title {{
+    color: var(--text-color); opacity: 0.6; font-size: 11px; font-weight: 700; text-transform: uppercase; margin-top: 5px;
+}}
+.empty-icon {{
+    font-size: 28px; color: #8EC5FC; font-weight: 300; line-height: 1;
 }}
 
-.empty-title {{ color: var(--text-color); opacity: 0.5; font-size: 14px; font-weight: 600; }}
-.empty-icon {{ font-size: 32px; color: #8EC5FC; font-weight: 300; margin: 5px 0; }}
-.empty-hint {{ font-size: 10px; color: var(--text-color); opacity: 0; transition: opacity 0.2s; }}
-.type-empty:hover .empty-hint {{ opacity: 0.6; }}
-
-.sub-title {{ font-weight: 700; font-size: 13px; margin-bottom: 4px; color: #2c3e50 !important; }}
-.sub-meta {{ font-size: 11px; opacity: 0.9; color: #2c3e50 !important; }}
+.sub-title {{ font-weight: 700; font-size: 13px; margin-bottom: 4px; }}
+.sub-meta {{ font-size: 11px; opacity: 0.9; }}
 .batch-badge {{
     background: rgba(255,255,255,0.6); padding: 3px 8px; border-radius: 10px;
-    font-size: 10px; font-weight: 700; text-transform: uppercase;
-    margin-bottom: 6px; color: #2c3e50 !important;
+    font-size: 10px; font-weight: 700; text-transform: uppercase; display: inline-block;
+    margin-bottom: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); color: #2c3e50 !important;
 }}
 
-/* OFFSET LECTURES */
+/* 1.5 HOUR OFFSET STYLES */
 .offset-wrapper {{ height: 100%; display: flex; flex-direction: column; }}
 .offset-spacer {{ flex: 0 0 25%; min-height: 25%; }}
 .offset-card-container {{ flex: 1; height: 100%; position: relative; }}
 .class-card.offset-style {{ border-radius: 18px; height: 100% !important; }}
+
+/* ATTENDANCE CARDS */
+.metric-card {{
+    background: var(--card-bg); border-radius: 20px; padding: 20px;
+    box-shadow: 0 4px 15px var(--card-shadow); text-align: center;
+    border: 1px solid rgba(128, 128, 128, 0.1); height: 100%; transition: transform 0.2s;
+}}
+.metric-card:hover {{ transform: translateY(-5px); }}
+.metric-value {{
+    font-size: 32px; font-weight: 800;
+    background: -webkit-linear-gradient(45deg, #6a11cb, #2575fc);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+}}
+.metric-title {{ color: var(--text-color); font-weight: 600; }}
+.metric-sub {{ color: var(--text-color); opacity: 0.7; font-size: 12px; }}
+
+.daily-card {{
+    background: var(--card-bg); border-radius: 18px; padding: 20px; margin-bottom: 15px;
+    box-shadow: 0 4px 10px var(--card-shadow); display: flex; justify-content: space-between;
+    align-items: center; border-left: 6px solid #6a11cb;
+}}
+.daily-info h4 {{ color: var(--text-color); margin: 0; font-weight: 700; }}
+.daily-info p {{ color: var(--text-color); opacity: 0.8; margin: 0; font-size: 14px; }}
+
+.student-card {{ 
+    background: var(--card-bg); border-radius: 24px; padding: 30px; text-align: center; 
+    margin-bottom: 30px; box-shadow: 0 10px 25px rgba(106, 17, 203, 0.1); 
+}}
+.student-name {{ 
+    font-size: 28px; font-weight: 700; 
+    background: -webkit-linear-gradient(45deg, #6a11cb, #2575fc); 
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 5px; 
+}}
+.student-meta {{ font-size: 15px; color: var(--text-color); opacity: 0.7; font-weight: 500; }}
+
+/* --- EXPANDER HEADER --- */
+[data-testid="stExpander"] summary p {{
+    background: -webkit-linear-gradient(45deg, #ff9a44, #fc6076);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    font-size: 18px !important;
+    font-weight: 800 !important;
+}}
+[data-testid="stExpander"] summary svg {{ fill: var(--text-color) !important; color: var(--text-color) !important; }}
 
 /* --- MODAL & VENUE CARDS --- */
 div[data-testid="stDialog"] {{
@@ -211,40 +329,33 @@ div[data-testid="stDialog"] {{
     color: var(--text-color) !important;
 }}
 
+.venue-card-row {{ display: flex; flex-direction: column; gap: 12px; margin-top: 15px; }}
 .venue-card {{
-    background-color: var(--venue-card-bg);
-    border: 1px solid var(--venue-border);
-    border-radius: 16px;
-    padding: 16px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.03);
-    margin-bottom: 12px;
+    background-color: var(--venue-card-bg); border: 1px solid var(--venue-border);
+    border-radius: 16px; padding: 16px; display: flex; align-items: center; justify-content: space-between;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.03); transition: transform 0.2s;
 }}
+.venue-card:hover {{ transform: translateX(5px); border-color: #6a11cb; }}
 .venue-left {{ display: flex; align-items: center; gap: 15px; }}
 .venue-icon-box {{
-    width: 45px; height: 45px;
-    background: linear-gradient(135deg, #6a11cb 0%, #a18cd1 100%);
+    width: 45px; height: 45px; background: linear-gradient(135deg, #6a11cb 0%, #a18cd1 100%);
     border-radius: 12px; display: flex; align-items: center; justify-content: center;
     font-size: 20px; color: white;
 }}
 .venue-details {{ display: flex; flex-direction: column; }}
 .venue-name {{ font-size: 18px; font-weight: 700; color: var(--text-color); }}
-.venue-type {{ font-size: 11px; text-transform: uppercase; color: var(--text-color); opacity: 0.6; font-weight: 600; }}
-.venue-extras {{ font-size: 12px; color: var(--text-color); opacity: 0.8; margin-top: 4px; }}
+.venue-type {{ font-size: 11px; text-transform: uppercase; color: var(--text-color); opacity: 0.6; letter-spacing: 0.5px; font-weight: 600; }}
+.venue-extras {{ font-size: 12px; color: var(--text-color); opacity: 0.8; margin-top: 4px; display: flex; gap: 10px; align-items: center; }}
 .venue-capacity-badge {{
     background-color: #f0f2f6; color: #2c3e50; font-size: 12px; font-weight: 600;
-    padding: 4px 10px; border-radius: 20px;
+    padding: 4px 10px; border-radius: 20px; display: flex; align-items: center; gap: 5px;
 }}
 [data-theme="dark"] .venue-capacity-badge {{ background-color: #333; color: #fff; }}
 
-/* ALLOCATION TABLE */
-.sub-alloc-wrapper {{ overflow-x: auto; margin-top: 10px; border-radius: 12px; background: var(--card-bg); }}
-table.sub-alloc-table {{ width: 100%; min-width: 600px; border-collapse: collapse; }}
-.sub-alloc-table thead th {{ background: linear-gradient(90deg, #a18cd1 0%, #fbc2eb 100%); color: white; padding: 18px; text-align: left; }}
-.sub-alloc-table tbody td {{ padding: 16px; border-bottom: 1px solid rgba(128,128,128,0.1); color: var(--text-color); }}
-.drive-btn {{ background: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%); color: white !important; padding: 8px 16px; border-radius: 50px; text-decoration: none; font-size: 13px; font-weight: 600; }}
+/* --- HIDDEN INPUT CSS --- */
+div[data-testid="stTextInput"]:has(input[aria-label="venue_bridge_input"]) {{
+    opacity: 0; height: 0px; width: 0px; overflow: hidden; margin: 0; padding: 0; position: absolute; z-index: -1;
+}}
 </style>
 """, unsafe_allow_html=True)
 
@@ -534,18 +645,18 @@ def render_grid(entries):
                 else:
                     html += f'<td {span}><div class="class-card filled" style="background:{grad}"><div class="batch-badge">{cell["Type"]}</div><div class="sub-title">{cell["Subject"]}</div><div class="sub-meta">📍 {cell["Venue"]}</div></div></td>'
             else:
-                # NEW EMPTY SLOT DESIGN
+                # NEW EMPTY SLOT DESIGN (BUTTON LIKE)
                 html += f'''<td>
-                    <div class="type-empty js-free-slot-trigger" data-day="{d}" data-time="{s}">
-                        <div class="empty-title">Free Slot</div>
+                    <div class="type-empty js-free-slot-trigger" data-day="{d}" data-time="{s}" title="Double click to find free classrooms">
                         <div class="empty-icon">+</div>
-                        <div class="empty-hint">Double click<br>or long press</div>
+                        <div class="empty-title">Find Empty<br>Classrooms</div>
                     </div>
                 </td>'''
         html += '</tr>'
     return html + '</tbody></table></div>'
 
 def render_subject_html(subjects, link_map):
+    # RESTORED SUBJECT UI (EXACT COPY FROM SOURCE)
     html_parts = ["""
     <div class="sub-alloc-wrapper"><table class="sub-alloc-table"><thead><tr><th style="width:40%">Subject Name</th><th style="width:20%">Batch</th><th style="width:20%">Division</th><th style="width:20%">Material</th></tr></thead><tbody>
     """]
@@ -678,35 +789,27 @@ with toggle_col:
     icon = "🌙" if st.session_state.theme == "light" else "☀️"
     if st.button(icon, on_click=toggle_theme, key="theme_toggle", help="Toggle Dark Mode"): pass
 
-# --- BRIDGE LOGIC (MOVED TO TOP TO PREVENT CRASH) ---
-# Logic: Checks if JS sent a value via the bridge input that is different from the last processed one.
+# --- BRIDGE LOGIC (PERSISTENT MODAL STATE) ---
 if st.session_state.venue_bridge and st.session_state.venue_bridge != st.session_state.last_processed_bridge:
     try:
-        # Update tracker to prevent infinite loops
         st.session_state.last_processed_bridge = st.session_state.venue_bridge
-        
-        # Parse Data: "Day|Time|RandomID"
         parts = st.session_state.venue_bridge.split('|')
         clicked_day = parts[0]
         clicked_time = parts[1]
         
-        # Calculate available venues and store in STATE
+        # Calculate and STORE venues in session state
         free_venues_list = get_free_venues_at_slot(clicked_day, clicked_time, sched_df, all_venues_set)
         
-        # Store in session state to PERSIST across re-runs
         st.session_state.active_slot_data = {
             "day": clicked_day,
             "time": clicked_time,
             "venues": free_venues_list
         }
-        
     except: pass
 
-# --- RENDER MODAL IF STATE IS ACTIVE ---
+# --- RENDER MODAL IF STATE EXISTS ---
 if st.session_state.active_slot_data:
     data = st.session_state.active_slot_data
-    
-    # Determine End Time for Label
     start_dt = datetime.strptime(data['time'], "%H:%M")
     end_dt = start_dt + timedelta(hours=1)
     time_range = f"{data['time']} - {end_dt.strftime('%H:%M')}"
@@ -724,7 +827,6 @@ if st.session_state.active_slot_data:
         if data['venues']:
             cards_html = '<div class="venue-card-row">'
             for v in data['venues']:
-                # Mock details based on venue name
                 v_type = "LECTURE HALL" if "L" in v or "A" in v else "LAB" if "LAB" in v.upper() else "TUTORIAL ROOM"
                 capacity = "60" if v_type == "LECTURE HALL" else "30"
                 amenity = "📽️ Projector" if v_type == "LECTURE HALL" else "💻 Computers" if v_type == "LAB" else "📝 Whiteboard"
@@ -747,8 +849,7 @@ if st.session_state.active_slot_data:
         else:
             st.warning("No free classrooms found for this slot.")
             
-        # IMPORTANT: Close Button to reset state
-        if st.button("Close", key="close_venue_modal"):
+        if st.button("Close", key="close_venue_modal", type="primary", use_container_width=True):
             st.session_state.active_slot_data = None
             st.rerun()
 
