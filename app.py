@@ -1178,41 +1178,45 @@ else:
                 </p>
             """, unsafe_allow_html=True)
 
-            # --- Logic for Defaults (Current Time) ---
+            # --- Logic for Defaults (Smart Auto-Select) ---
             now = datetime.now()
             current_day = now.strftime("%A")
-            current_hour = now.hour
             
-            # Round current time to nearest slot logic for default selection
-            # If it's 10:45, we probably want to check the 10:30 slot
-            default_slot_index = 0
+            days_list = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
             slots = ["8:30", "9:30", "10:30", "11:30", "12:30", "13:30", "14:30", "15:30", "16:30", "17:30"]
             
-            # Simple heuristic to pick default time in dropdown
-            for i, s in enumerate(slots):
-                try:
-                    h = int(s.split(':')[0])
-                    if current_hour == h:
-                        default_slot_index = i
+            # Initialize defaults to Monday 8:30 (Index 0, 0)
+            def_day_idx = 0 
+            def_time_idx = 0
+            
+            # SMART CHECK: Only auto-select if today is Mon-Sat...
+            if current_day in days_list:
+                curr_mins = now.hour * 60 + now.minute
+                
+                # ...AND current time is within the valid schedule range (8:30 to 18:30)
+                # We iterate to find which slot the student is currently sitting in.
+                for i, s in enumerate(slots):
+                    h, m = map(int, s.split(':'))
+                    slot_mins = h * 60 + m
+                    
+                    # If current time is within a slot (e.g., 10:45 falls in 10:30-11:30)
+                    if slot_mins <= curr_mins < (slot_mins + 60):
+                        def_day_idx = days_list.index(current_day)
+                        def_time_idx = i
                         break
-                except: pass
 
             # --- Controls UI ---
             c_find_1, c_find_2, c_find_3 = st.columns([2, 2, 1])
             
             with c_find_1:
-                days_list = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
-                # Default to current day if it's a weekday, else Monday
-                def_day_idx = days_list.index(current_day) if current_day in days_list else 0
                 selected_day = st.selectbox("Select Day", days_list, index=def_day_idx)
                 
             with c_find_2:
-                selected_time = st.selectbox("Select Time", slots, index=default_slot_index)
+                selected_time = st.selectbox("Select Time", slots, index=def_time_idx)
                 
             with c_find_3:
                 st.write("") # Spacer
                 st.write("") # Spacer
-                # Button is just for UX feel, as Streamlit updates on selectbox change anyway
                 st.button("Search 🔎", type="primary", key="btn_find_room")
 
             # --- Calculation & Render ---
@@ -1340,6 +1344,7 @@ st.markdown(f"""
     Student Portal © 2026 • Built by <span style="color:#6a11cb; font-weight:700">IRONDEM2921 [AIML]</span>
 </div>
 """, unsafe_allow_html=True)
+
 
 
 
