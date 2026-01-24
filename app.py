@@ -446,7 +446,7 @@ def get_google_client():
 
 def get_google_sheet(index=0):
     client = get_google_client()
-    sheet_url = st.secrets["game_sheet_url"] 
+    sheet_url = st.secrets["private_sheet_url"] 
     try:
         sh = client.open_by_url(sheet_url)
         if index >= len(sh.worksheets()):
@@ -805,7 +805,7 @@ def get_leaderboard_data():
     """Fetches live scores with debug error handling."""
     try:
         client = get_google_client()
-        sheet_url = st.secrets["private_sheet_url"]
+        sheet_url = st.secrets["game_sheet_url"]
         sh = client.open_by_url(sheet_url)
 
         # --- ADD THIS DEBUG LINE HERE ---
@@ -1516,6 +1516,7 @@ st.markdown(f"""
     Student Portal © 2026 • Built by <span style="color:#6a11cb; font-weight:700">IRONDEM2921 [AIML]</span>
 </div>
 """, unsafe_allow_html=True)
+
 
 
 
