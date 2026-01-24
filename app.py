@@ -519,6 +519,7 @@ def normalize_venue(venue_text):
 def get_vacant_venues(sched_df, target_day, target_time_str):
     """
     Returns a list of venues that are NOT occupied at the specific Day and Time.
+    Includes logic to fix 12-hour format ambiguity (e.g. treating '1:30' as '13:30').
     """
     if sched_df is None or sched_df.empty:
         return []
@@ -529,7 +530,7 @@ def get_vacant_venues(sched_df, target_day, target_time_str):
     except:
         return [] # Invalid time format
 
-    # 2. Identify ALL known venues from the database
+    # 2. Identify ALL known venues
     venue_col = next((c for c in sched_df.columns if "Venue" in c), None)
     if not venue_col: return []
     
@@ -541,27 +542,37 @@ def get_vacant_venues(sched_df, target_day, target_time_str):
     # 3. Find Occupied Venues
     occupied_venues = set()
     
-    # Filter by Day first
+    # Filter by Day
     day_col = next((c for c in sched_df.columns if "Day" in c), None)
     time_col = next((c for c in sched_df.columns if "Time" in c), None)
     
-    day_schedule = sched_df[sched_df[day_col].astype(str).str.strip().str.title() == target_day]
+    # Normalize day names for comparison (strip spaces, title case)
+    target_day_clean = target_day.strip().title()
+    day_schedule = sched_df[sched_df[day_col].astype(str).str.strip().str.title() == target_day_clean]
     
     for _, row in day_schedule.iterrows():
         start_str, duration = parse_time(row[time_col])
         if start_str:
             try:
-                # Construct Start and End Datetime for comparison
+                # Basic Parse (e.g., "1:30" becomes 01:30 AM)
                 class_start = datetime.strptime(start_str, "%H:%M")
+                
+                # --- CRITICAL FIX: Handle AM/PM Ambiguity ---
+                # If a class starts before 8:00 AM, it is definitely a PM class (e.g. 1:30 -> 13:30)
+                # Unless the duration wraps weirdly, this simple heuristic covers 99% of college timetables.
+                if class_start.hour < 8:
+                    class_start = class_start.replace(hour=class_start.hour + 12)
+                
+                # Calculate End Time based on corrected Start Time
                 class_end = class_start + timedelta(hours=duration)
                 
-                # Check if our Target Time falls within this class
-                # We convert everything to minutes for easier comparison
+                # Convert everything to minutes for comparison
                 q_mins = q_time.hour * 60 + q_time.minute
                 s_mins = class_start.hour * 60 + class_start.minute
                 e_mins = class_end.hour * 60 + class_end.minute
                 
-                # CORRECTED LOGIC: Is Query Time >= Start AND Query Time < End?
+                # Logic: Is the Query Time INSIDE the class slot?
+                # Start is Inclusive (>=), End is Exclusive (<)
                 if q_mins >= s_mins and q_mins < e_mins:
                     occ_venue = normalize_venue(row[venue_col])
                     if occ_venue:
@@ -1328,6 +1339,7 @@ st.markdown(f"""
     Student Portal © 2026 • Built by <span style="color:#6a11cb; font-weight:700">IRONDEM2921 [AIML]</span>
 </div>
 """, unsafe_allow_html=True)
+
 
 
 
