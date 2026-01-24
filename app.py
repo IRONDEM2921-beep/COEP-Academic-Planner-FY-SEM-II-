@@ -795,6 +795,84 @@ def calculate_semester_totals(timetable_entries):
         curr_date += timedelta(days=1)
     return totals
 
+
+# --------------------------------------------------
+# 8. NEW: LEADERBOARD & BRANCH HELPERS
+# --------------------------------------------------
+
+def get_leaderboard_sheet():
+    """Connects specifically to the 'Leaderboard' tab."""
+    try:
+        client = get_google_client()
+        sheet_url = st.secrets["private_sheet_url"]
+        sh = client.open_by_url(sheet_url)
+        # Try to open the specific tab named "Leaderboard"
+        return sh.worksheet("Leaderboard")
+    except gspread.exceptions.WorksheetNotFound:
+        # If it doesn't exist, fall back to the first sheet or create it
+        return sh.get_worksheet(0)
+    except Exception as e:
+        return None
+
+def get_leaderboard_data():
+    """Fetches and cleans the leaderboard data."""
+    sheet = get_leaderboard_sheet()
+    if not sheet: return pd.DataFrame()
+
+    try:
+        # Get all records
+        data = sheet.get_all_values()
+        if not data: return pd.DataFrame()
+        
+        # Assume standard columns if headers are missing or messy
+        # We expect: Date, MIS, Branch, Score
+        df = pd.DataFrame(data, columns=["Date", "MIS", "Branch", "Score"])
+        
+        # Convert Score to number (force cleanup of bad data)
+        df['Score'] = pd.to_numeric(df['Score'], errors='coerce').fillna(0).astype(int)
+        return df
+    except:
+        return pd.DataFrame()
+
+def render_leaderboard_ui(user_branch):
+    """Draws the Leaderboard in the sidebar or main column."""
+    df = get_leaderboard_data()
+    
+    if df.empty:
+        st.info("No scores yet. Be the first!")
+        return
+
+    # LOGIC: Find the MAX score for every unique branch
+    # 1. Sort by Score (High -> Low)
+    df = df.sort_values(by='Score', ascending=False)
+    # 2. Drop duplicates on 'Branch' (keeping the first one, which is the highest)
+    best_per_branch = df.drop_duplicates(subset=['Branch'])
+    
+    st.markdown("#### 🏆 Top Scores by Branch")
+    
+    for _, row in best_per_branch.iterrows():
+        b_name = str(row['Branch']).strip()
+        score = row['Score']
+        player = str(row['MIS'])
+        
+        # Highlight if it matches the current user's branch
+        is_my_branch = user_branch and (b_name.lower() == str(user_branch).lower())
+        
+        # Styling
+        border = "2px solid #6a11cb" if is_my_branch else "1px solid rgba(128,128,128,0.2)"
+        bg = "rgba(106,17,203,0.05)" if is_my_branch else "transparent"
+        icon = "👑" if is_my_branch else "📍"
+        
+        st.markdown(f"""
+        <div style="border: {border}; background: {bg}; border-radius: 12px; padding: 12px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center;">
+            <div>
+                <div style="font-weight: 700; font-size: 14px;">{icon} {b_name}</div>
+                <div style="font-size: 11px; opacity: 0.7;">Player: {player}</div>
+            </div>
+            <div style="font-size: 20px; font-weight: 800; color: #6a11cb;">{score}</div>
+        </div>
+        """, unsafe_allow_html=True)
+
 # --------------------------------------------------
 # 6. GAME INTEGRATION
 # --------------------------------------------------
@@ -1092,6 +1170,64 @@ def render_game_html():
 </html>
 """
 
+
+
+def render_connected_game(mis, branch):
+    """Injects the Google Script URL and User Data into the Game HTML."""
+    
+    # 1. Get the base game HTML
+    html_content = render_game_html()
+    
+    # 2. Get the Secret URL you saved in Streamlit
+    script_url = st.secrets.get("google_script_url", "")
+    
+    if not script_url:
+        return html_content  # Return normal offline game if setup is missing
+
+    # 3. Create the Javascript Bridge
+    # This script allows the game to talk to your Google Sheet
+    injection_code = f"""
+    <script>
+        // --- DATA INJECTED FROM PYTHON ---
+        const USER_MIS = "{mis}";
+        const USER_BRANCH = "{branch}";
+        const GOOGLE_URL = "{script_url}";
+
+        // Function to send data
+        function sendScoreToBackend(finalScore) {{
+            if (!GOOGLE_URL || finalScore === 0) return;
+            
+            const payload = {{
+                mis: USER_MIS,
+                branch: USER_BRANCH,
+                score: finalScore
+            }};
+            
+            // "no-cors" is required to talk to Google Scripts from a browser
+            fetch(GOOGLE_URL, {{
+                method: "POST",
+                mode: "no-cors",
+                headers: {{ "Content-Type": "application/json" }},
+                body: JSON.stringify(payload)
+            }}).then(() => console.log("Score sent!"))
+              .catch(e => console.error("Error:", e));
+        }}
+    </script>
+    """
+    
+    # 4. Inject the bridge into the HTML
+    # We add the script at the end of the body
+    html_content = html_content.replace("</body>", f"{injection_code}</body>")
+    
+    # 5. Connect the Game Over trigger
+    # We find the existing Game Over function and make it call our new sender
+    html_content = html_content.replace(
+        "function triggerGameOverSequence() {", 
+        "function triggerGameOverSequence() { sendScoreToBackend(score); "
+    )
+    
+    return html_content
+
 # --------------------------------------------------
 # 7. MAIN APPLICATION
 # --------------------------------------------------
@@ -1325,17 +1461,29 @@ else:
                 col_idx += 1
 
             # --- 4. GAME SECTION ---
+            # --- 4. GAME SECTION (UPDATED) ---
             st.markdown("""<hr style="border:1px solid rgba(128,128,128,0.2); margin: 40px 0;">""", unsafe_allow_html=True)
-            st.markdown("""<h3 style="font-size: 28px; font-weight: 700; margin-bottom: 20px; background: linear-gradient(to right, #6a11cb, #fbc2eb); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">🎮 Stress Buster Game</h3>""", unsafe_allow_html=True)
+            
+            # Create two columns: Game (Left) and Leaderboard (Right)
+            col_game, col_leaderboard = st.columns([2, 1])
 
-            c_game_main, c_game_info = st.columns([3, 1])
-            with c_game_main:
-                game_html = render_game_html()
+            with col_game:
+                st.markdown("""<h3 style="font-size: 28px; font-weight: 700; margin-bottom: 20px; background: linear-gradient(to right, #6a11cb, #fbc2eb); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">🎮 Stress Buster</h3>""", unsafe_allow_html=True)
+                
+                # Render the connected game
+                # We pass the user's MIS and Branch so the score saves correctly
+                game_html = render_connected_game(mis, branch)
                 components.html(game_html, height=650, scrolling=False)
             
-            with c_game_info:
-                st.info(f"**Playing as:**\n\n{name}\n\n({branch})")
-                st.caption("Just relax and jump! No high scores are saved to the server.")
+            with col_leaderboard:
+                st.markdown("""<h3 style="font-size: 24px; font-weight: 700; margin-bottom: 20px;">🏆 Branch Wars</h3>""", unsafe_allow_html=True)
+                
+                # Show the leaderboard
+                render_leaderboard_ui(branch)
+                
+                st.write("")
+                if st.button("🔄 Refresh Scores"):
+                    st.rerun()
 
         else:
             st.error("MIS not found.")
@@ -1350,5 +1498,3 @@ st.markdown(f"""
     Student Portal © 2026 • Built by <span style="color:#6a11cb; font-weight:700">IRONDEM2921 [AIML]</span>
 </div>
 """, unsafe_allow_html=True)
-
-
