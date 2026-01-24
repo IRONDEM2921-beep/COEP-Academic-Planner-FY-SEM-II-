@@ -519,10 +519,14 @@ def normalize_venue(venue_text):
 def get_vacant_venues(sched_df, target_day, target_time_str):
     """
     Returns a list of venues that are NOT occupied at the specific Day and Time.
-    Includes logic to fix 12-hour format ambiguity (e.g. treating '1:30' as '13:30').
+    Filters out labs/restricted areas and fixes 12-hour format ambiguity.
     """
     if sched_df is None or sched_df.empty:
         return []
+
+    # --- CONFIG: Venues to Ignore (Labs, Auditorium, etc.) ---
+    # These will NEVER appear in the "Available" list.
+    IGNORED_VENUES = ["COGNIZANT", "CS LAB", "EP LAB", "EC LAB", "CHEM LAB", "PHY LAB", "FPL LAB"]
 
     # 1. Parse the Target Time
     try:
@@ -530,14 +534,17 @@ def get_vacant_venues(sched_df, target_day, target_time_str):
     except:
         return [] # Invalid time format
 
-    # 2. Identify ALL known venues
+    # 2. Identify ALL known venues (Filtering out the ignored ones)
     venue_col = next((c for c in sched_df.columns if "Venue" in c), None)
     if not venue_col: return []
     
     all_venues = set()
     for v in sched_df[venue_col].unique():
         norm = normalize_venue(v)
-        if norm: all_venues.add(norm)
+        
+        # FILTER LOGIC: Skip if it's in our ignored list
+        if norm and norm not in IGNORED_VENUES: 
+            all_venues.add(norm)
 
     # 3. Find Occupied Venues
     occupied_venues = set()
@@ -546,7 +553,6 @@ def get_vacant_venues(sched_df, target_day, target_time_str):
     day_col = next((c for c in sched_df.columns if "Day" in c), None)
     time_col = next((c for c in sched_df.columns if "Time" in c), None)
     
-    # Normalize day names for comparison (strip spaces, title case)
     target_day_clean = target_day.strip().title()
     day_schedule = sched_df[sched_df[day_col].astype(str).str.strip().str.title() == target_day_clean]
     
@@ -554,25 +560,20 @@ def get_vacant_venues(sched_df, target_day, target_time_str):
         start_str, duration = parse_time(row[time_col])
         if start_str:
             try:
-                # Basic Parse (e.g., "1:30" becomes 01:30 AM)
+                # Basic Parse
                 class_start = datetime.strptime(start_str, "%H:%M")
                 
-                # --- CRITICAL FIX: Handle AM/PM Ambiguity ---
-                # If a class starts before 8:00 AM, it is definitely a PM class (e.g. 1:30 -> 13:30)
-                # Unless the duration wraps weirdly, this simple heuristic covers 99% of college timetables.
+                # AM/PM Fix: If class starts before 8:00, assume PM (e.g. 1:30 -> 13:30)
                 if class_start.hour < 8:
                     class_start = class_start.replace(hour=class_start.hour + 12)
                 
-                # Calculate End Time based on corrected Start Time
                 class_end = class_start + timedelta(hours=duration)
                 
-                # Convert everything to minutes for comparison
                 q_mins = q_time.hour * 60 + q_time.minute
                 s_mins = class_start.hour * 60 + class_start.minute
                 e_mins = class_end.hour * 60 + class_end.minute
                 
-                # Logic: Is the Query Time INSIDE the class slot?
-                # Start is Inclusive (>=), End is Exclusive (<)
+                # Check Overlap
                 if q_mins >= s_mins and q_mins < e_mins:
                     occ_venue = normalize_venue(row[venue_col])
                     if occ_venue:
@@ -1339,6 +1340,7 @@ st.markdown(f"""
     Student Portal © 2026 • Built by <span style="color:#6a11cb; font-weight:700">IRONDEM2921 [AIML]</span>
 </div>
 """, unsafe_allow_html=True)
+
 
 
 
