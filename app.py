@@ -815,63 +815,106 @@ def get_leaderboard_sheet():
         return None
 
 def get_leaderboard_data():
-    """Fetches and cleans the leaderboard data."""
+    """Fetches, cleans, and sorts leaderboard data."""
     sheet = get_leaderboard_sheet()
     if not sheet: return pd.DataFrame()
 
     try:
         # Get all records
         data = sheet.get_all_values()
-        if not data: return pd.DataFrame()
         
-        # Assume standard columns if headers are missing or messy
-        # We expect: Date, MIS, Branch, Score
-        df = pd.DataFrame(data, columns=["Date", "MIS", "Branch", "Score"])
+        # ERROR CHECK 1: Empty Sheet
+        if not data or len(data) < 2: 
+            return pd.DataFrame()
+            
+        # Convert to DataFrame
+        # We assume 5 columns: Date, MIS, Branch, Score, Name
+        # If columns are missing, we pad them to avoid crashes
+        expected_cols = ["Date", "MIS", "Branch", "Score", "Name"]
+        df = pd.DataFrame(data, columns=expected_cols[:len(data[0])])
         
-        # Convert Score to number (force cleanup of bad data)
-        df['Score'] = pd.to_numeric(df['Score'], errors='coerce').fillna(0).astype(int)
+        # Add missing columns if they don't exist yet
+        for col in expected_cols:
+            if col not in df.columns:
+                df[col] = ""
+
+        # ERROR CHECK 2: Remove Header Row
+        # If the first row contains "Score" in the Score column, drop it
+        df = df[pd.to_numeric(df['Score'], errors='coerce').notnull()]
+
+        # Clean types
+        df['Score'] = df['Score'].astype(int)
+        df['Branch'] = df['Branch'].astype(str).str.strip()
+        df['Name'] = df['Name'].astype(str).str.strip()
+        
         return df
-    except:
+    except Exception as e:
+        # Silently fail but log if needed
         return pd.DataFrame()
 
 def render_leaderboard_ui(user_branch):
-    """Draws the Leaderboard in the sidebar or main column."""
+    """Draws the Branch Wars Leaderboard."""
     df = get_leaderboard_data()
     
+    st.markdown("""<h3 style="font-size: 24px; font-weight: 700; margin-bottom: 20px;">🏆 Branch Wars</h3>""", unsafe_allow_html=True)
+    st.caption("Top champion from every branch.")
+
     if df.empty:
-        st.info("No scores yet. Be the first!")
+        st.info("No records yet. Play to claim the throne!")
         return
 
-    # LOGIC: Find the MAX score for every unique branch
-    # 1. Sort by Score (High -> Low)
-    df = df.sort_values(by='Score', ascending=False)
-    # 2. Drop duplicates on 'Branch' (keeping the first one, which is the highest)
-    best_per_branch = df.drop_duplicates(subset=['Branch'])
+    # LOGIC: 
+    # 1. Sort by Score (Highest first)
+    # 2. Drop duplicates on Branch (Keep only the top scorer for that branch)
+    best_per_branch = df.sort_values(by='Score', ascending=False).drop_duplicates(subset=['Branch'])
     
-    st.markdown("#### 🏆 Top Scores by Branch")
-    
+    # Render UI
     for _, row in best_per_branch.iterrows():
-        b_name = str(row['Branch']).strip()
+        b_name = row['Branch']
         score = row['Score']
-        player = str(row['MIS'])
+        player_name = row['Name'] if row['Name'] else row['MIS'] # Fallback to MIS if Name missing
         
-        # Highlight if it matches the current user's branch
+        # Highlight User's Branch
         is_my_branch = user_branch and (b_name.lower() == str(user_branch).lower())
         
-        # Styling
-        border = "2px solid #6a11cb" if is_my_branch else "1px solid rgba(128,128,128,0.2)"
-        bg = "rgba(106,17,203,0.05)" if is_my_branch else "transparent"
-        icon = "👑" if is_my_branch else "📍"
+        # Dynamic Styling
+        border_color = "#6a11cb" if is_my_branch else "rgba(128,128,128,0.2)"
+        bg_color = "rgba(106,17,203,0.05)" if is_my_branch else "var(--card-bg)"
+        trophy = "👑" if is_my_branch else "🛡️"
         
-        st.markdown(f"""
-        <div style="border: {border}; background: {bg}; border-radius: 12px; padding: 12px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center;">
+        html_card = f"""
+        <div style="
+            border: 2px solid {border_color}; 
+            background: {bg_color}; 
+            border-radius: 15px; 
+            padding: 15px; 
+            margin-bottom: 12px; 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            transition: transform 0.2s;
+        ">
             <div>
-                <div style="font-weight: 700; font-size: 14px;">{icon} {b_name}</div>
-                <div style="font-size: 11px; opacity: 0.7;">Player: {player}</div>
+                <div style="font-weight: 800; font-size: 15px; color: var(--text-color); margin-bottom:4px;">
+                    {trophy} {b_name}
+                </div>
+                <div style="font-size: 12px; opacity: 0.8; color: var(--text-color);">
+                    👤 {player_name}
+                </div>
             </div>
-            <div style="font-size: 20px; font-weight: 800; color: #6a11cb;">{score}</div>
+            <div style="text-align: right;">
+                 <div style="font-size: 10px; text-transform: uppercase; font-weight: 700; opacity: 0.6;">Score</div>
+                 <div style="font-size: 22px; font-weight: 900; color: #6a11cb; line-height: 1;">{score}</div>
+            </div>
         </div>
-        """, unsafe_allow_html=True)
+        """
+        st.markdown(html_card, unsafe_allow_html=True)
+
+    st.write("")
+    if st.button("🔄 Check for New High Scores", use_container_width=True):
+        st.cache_data.clear() # Clear cache to force fresh fetch
+        st.rerun()
 
 # --------------------------------------------------
 # 6. GAME INTEGRATION
@@ -1171,62 +1214,55 @@ def render_game_html():
 """
 
 
-
-def render_connected_game(mis, branch):
-    """Injects the Google Script URL and User Data into the Game HTML."""
-    
-    # 1. Get the base game HTML
+def render_connected_game(mis, branch, user_name):
+    """Injects USER DATA + BRIDGE into the game."""
     html_content = render_game_html()
-    
-    # 2. Get the Secret URL you saved in Streamlit
     script_url = st.secrets.get("google_script_url", "")
     
-    if not script_url:
-        return html_content  # Return normal offline game if setup is missing
+    if not script_url: return html_content
 
-    # 3. Create the Javascript Bridge
-    # This script allows the game to talk to your Google Sheet
+    # JAVASCRIPT INJECTION
+    # We add 'const USER_NAME' and include it in the payload
     injection_code = f"""
     <script>
-        // --- DATA INJECTED FROM PYTHON ---
         const USER_MIS = "{mis}";
         const USER_BRANCH = "{branch}";
+        const USER_NAME = "{user_name}"; // <--- NEW: Name Variable
         const GOOGLE_URL = "{script_url}";
 
-        // Function to send data
         function sendScoreToBackend(finalScore) {{
             if (!GOOGLE_URL || finalScore === 0) return;
+            
+            // Log to console for debugging
+            console.log("Attempting to save score...", finalScore);
             
             const payload = {{
                 mis: USER_MIS,
                 branch: USER_BRANCH,
+                name: USER_NAME,  // <--- NEW: Sending Name
                 score: finalScore
             }};
             
-            // "no-cors" is required to talk to Google Scripts from a browser
             fetch(GOOGLE_URL, {{
                 method: "POST",
                 mode: "no-cors",
                 headers: {{ "Content-Type": "application/json" }},
                 body: JSON.stringify(payload)
-            }}).then(() => console.log("Score sent!"))
-              .catch(e => console.error("Error:", e));
+            }}).then(() => {{
+                console.log("Score sent successfully!");
+            }}).catch(e => console.error("Save failed:", e));
         }}
     </script>
     """
     
-    # 4. Inject the bridge into the HTML
-    # We add the script at the end of the body
     html_content = html_content.replace("</body>", f"{injection_code}</body>")
-    
-    # 5. Connect the Game Over trigger
-    # We find the existing Game Over function and make it call our new sender
     html_content = html_content.replace(
         "function triggerGameOverSequence() {", 
         "function triggerGameOverSequence() { sendScoreToBackend(score); "
     )
     
     return html_content
+
 
 # --------------------------------------------------
 # 7. MAIN APPLICATION
@@ -1472,7 +1508,7 @@ else:
                 
                 # Render the connected game
                 # We pass the user's MIS and Branch so the score saves correctly
-                game_html = render_connected_game(mis, branch)
+                game_html = render_connected_game(mis, branch, name)
                 components.html(game_html, height=650, scrolling=False)
             
             with col_leaderboard:
@@ -1498,3 +1534,4 @@ st.markdown(f"""
     Student Portal © 2026 • Built by <span style="color:#6a11cb; font-weight:700">IRONDEM2921 [AIML]</span>
 </div>
 """, unsafe_allow_html=True)
+
