@@ -21,7 +21,7 @@ st.set_page_config(page_title="Student Timetable", page_icon="✨", layout="wide
 if 'theme' not in st.session_state:
     st.session_state.theme = 'light'
 
-# Initialize Bridge State for JS Communication
+# Initialize Bridge State
 if 'venue_bridge' not in st.session_state:
     st.session_state.venue_bridge = ""
 if 'last_processed_bridge' not in st.session_state:
@@ -194,7 +194,7 @@ table.custom-grid {{ width: 100%; min-width: 1000px; border-collapse: separate; 
 }}
 .class-card.filled:hover {{ transform: translateY(-5px) scale(1.03); box-shadow: 0 15px 30px rgba(0,0,0,0.15) !important; z-index: 100; }}
 
-/* --- NEW EMPTY SLOT DESIGN --- */
+/* --- NEW EMPTY SLOT DESIGN (Fixed) --- */
 .type-empty {{ 
     background: var(--card-bg); 
     border: 2px dashed rgba(160, 160, 200, 0.3); 
@@ -205,12 +205,13 @@ table.custom-grid {{ width: 100%; min-width: 1000px; border-collapse: separate; 
     align-items: center;
     justify-content: center;
     text-align: center;
-    transition: all 0.2s;
-    /* Prevent text selection */
-    -webkit-user-select: none;
-    -moz-user-select: none;
-    -ms-user-select: none;
-    user-select: none;
+    transition: all 0.1s;
+    
+    /* Disable Text Selection */
+    -webkit-user-select: none; 
+    -moz-user-select: none;    
+    -ms-user-select: none;     
+    user-select: none;         
 }}
 .type-empty:hover {{ 
     border-color: #8EC5FC; 
@@ -218,22 +219,22 @@ table.custom-grid {{ width: 100%; min-width: 1000px; border-collapse: separate; 
     transform: scale(0.98);
 }}
 .type-empty:active {{
-    transform: scale(0.95);
-    background-color: rgba(142, 197, 252, 0.1);
-}}
-.empty-title {{
-    color: var(--text-color); opacity: 0.6; font-size: 11px; font-weight: 700; text-transform: uppercase; margin-top: 5px;
-}}
-.empty-icon {{
-    font-size: 28px; color: #8EC5FC; font-weight: 300; line-height: 1;
+    transform: scale(0.96);
+    background-color: rgba(142, 197, 252, 0.2);
+    border-color: #6a11cb;
 }}
 
-.sub-title {{ font-weight: 700; font-size: 13px; margin-bottom: 4px; }}
-.sub-meta {{ font-size: 11px; opacity: 0.9; }}
+.empty-title {{ color: var(--text-color); opacity: 0.5; font-size: 14px; font-weight: 600; }}
+.empty-icon {{ font-size: 32px; color: #8EC5FC; font-weight: 300; margin: 5px 0; }}
+.empty-hint {{ font-size: 10px; color: var(--text-color); opacity: 0; transition: opacity 0.2s; }}
+.type-empty:hover .empty-hint {{ opacity: 0.6; }}
+
+.sub-title {{ font-weight: 700; font-size: 13px; margin-bottom: 4px; color: #2c3e50 !important; }}
+.sub-meta {{ font-size: 11px; opacity: 0.9; color: #2c3e50 !important; }}
 .batch-badge {{
     background: rgba(255,255,255,0.6); padding: 3px 8px; border-radius: 10px;
-    font-size: 10px; font-weight: 700; text-transform: uppercase; display: inline-block;
-    margin-bottom: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); color: #2c3e50 !important;
+    font-size: 10px; font-weight: 700; text-transform: uppercase;
+    margin-bottom: 6px; color: #2c3e50 !important;
 }}
 
 /* OFFSET LECTURES */
@@ -241,6 +242,47 @@ table.custom-grid {{ width: 100%; min-width: 1000px; border-collapse: separate; 
 .offset-spacer {{ flex: 0 0 25%; min-height: 25%; }}
 .offset-card-container {{ flex: 1; height: 100%; position: relative; }}
 .class-card.offset-style {{ border-radius: 18px; height: 100% !important; }}
+
+/* --- MODAL & VENUE CARDS --- */
+div[data-testid="stDialog"] {{
+    background-color: var(--modal-bg) !important;
+    color: var(--text-color) !important;
+}}
+
+.venue-card {{
+    background-color: var(--venue-card-bg);
+    border: 1px solid var(--venue-border);
+    border-radius: 16px;
+    padding: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.03);
+    margin-bottom: 12px;
+}}
+.venue-left {{ display: flex; align-items: center; gap: 15px; }}
+.venue-icon-box {{
+    width: 45px; height: 45px;
+    background: linear-gradient(135deg, #6a11cb 0%, #a18cd1 100%);
+    border-radius: 12px; display: flex; align-items: center; justify-content: center;
+    font-size: 20px; color: white;
+}}
+.venue-details {{ display: flex; flex-direction: column; }}
+.venue-name {{ font-size: 18px; font-weight: 700; color: var(--text-color); }}
+.venue-type {{ font-size: 11px; text-transform: uppercase; color: var(--text-color); opacity: 0.6; font-weight: 600; }}
+.venue-extras {{ font-size: 12px; color: var(--text-color); opacity: 0.8; margin-top: 4px; }}
+.venue-capacity-badge {{
+    background-color: #f0f2f6; color: #2c3e50; font-size: 12px; font-weight: 600;
+    padding: 4px 10px; border-radius: 20px;
+}}
+[data-theme="dark"] .venue-capacity-badge {{ background-color: #333; color: #fff; }}
+
+/* ALLOCATION TABLE */
+.sub-alloc-wrapper {{ overflow-x: auto; margin-top: 10px; border-radius: 12px; background: var(--card-bg); }}
+table.sub-alloc-table {{ width: 100%; min-width: 600px; border-collapse: collapse; }}
+.sub-alloc-table thead th {{ background: linear-gradient(90deg, #a18cd1 0%, #fbc2eb 100%); color: white; padding: 18px; text-align: left; }}
+.sub-alloc-table tbody td {{ padding: 16px; border-bottom: 1px solid rgba(128,128,128,0.1); color: var(--text-color); }}
+.drive-btn {{ background: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%); color: white !important; padding: 8px 16px; border-radius: 50px; text-decoration: none; font-size: 13px; font-weight: 600; }}
 
 /* ATTENDANCE CARDS */
 .metric-card {{
@@ -275,45 +317,6 @@ table.custom-grid {{ width: 100%; min-width: 1000px; border-collapse: separate; 
     -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 5px; 
 }}
 .student-meta {{ font-size: 15px; color: var(--text-color); opacity: 0.7; font-weight: 500; }}
-
-/* --- EXPANDER HEADER --- */
-[data-testid="stExpander"] summary p {{
-    background: -webkit-linear-gradient(45deg, #ff9a44, #fc6076);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    font-size: 18px !important;
-    font-weight: 800 !important;
-}}
-[data-testid="stExpander"] summary svg {{ fill: var(--text-color) !important; color: var(--text-color) !important; }}
-
-/* --- MODAL & VENUE CARDS --- */
-div[data-testid="stDialog"] {{
-    background-color: var(--modal-bg) !important;
-    color: var(--text-color) !important;
-}}
-
-.venue-card-row {{ display: flex; flex-direction: column; gap: 12px; margin-top: 15px; }}
-.venue-card {{
-    background-color: var(--venue-card-bg); border: 1px solid var(--venue-border);
-    border-radius: 16px; padding: 16px; display: flex; align-items: center; justify-content: space-between;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.03); transition: transform 0.2s;
-}}
-.venue-card:hover {{ transform: translateX(5px); border-color: #6a11cb; }}
-.venue-left {{ display: flex; align-items: center; gap: 15px; }}
-.venue-icon-box {{
-    width: 45px; height: 45px; background: linear-gradient(135deg, #6a11cb 0%, #a18cd1 100%);
-    border-radius: 12px; display: flex; align-items: center; justify-content: center;
-    font-size: 20px; color: white;
-}}
-.venue-details {{ display: flex; flex-direction: column; }}
-.venue-name {{ font-size: 18px; font-weight: 700; color: var(--text-color); }}
-.venue-type {{ font-size: 11px; text-transform: uppercase; color: var(--text-color); opacity: 0.6; letter-spacing: 0.5px; font-weight: 600; }}
-.venue-extras {{ font-size: 12px; color: var(--text-color); opacity: 0.8; margin-top: 4px; display: flex; gap: 10px; align-items: center; }}
-.venue-capacity-badge {{
-    background-color: #f0f2f6; color: #2c3e50; font-size: 12px; font-weight: 600;
-    padding: 4px 10px; border-radius: 20px; display: flex; align-items: center; gap: 5px;
-}}
-[data-theme="dark"] .venue-capacity-badge {{ background-color: #333; color: #fff; }}
 </style>
 """, unsafe_allow_html=True)
 
@@ -614,7 +617,7 @@ def render_grid(entries):
     return html + '</tbody></table></div>'
 
 def render_subject_html(subjects, link_map):
-    # RESTORED SUBJECT UI
+    # RESTORED SUBJECT UI (EXACT COPY FROM SOURCE)
     html_parts = ["""
     <div class="sub-alloc-wrapper"><table class="sub-alloc-table"><thead><tr><th style="width:40%">Subject Name</th><th style="width:20%">Batch</th><th style="width:20%">Division</th><th style="width:20%">Material</th></tr></thead><tbody>
     """]
@@ -769,58 +772,65 @@ if st.session_state.venue_bridge and st.session_state.venue_bridge != st.session
             "venues": free_venues_list
         }
         
-    except: pass
+    except Exception as e:
+        st.error(f"Error processing slot interaction: {e}")
 
-# --- RENDER MODAL IF STATE IS ACTIVE ---
+# --- GLOBAL DIALOG DEFINITION (Outside the if block) ---
+# We define the dialog function once, globally.
+@st.dialog("Available Classrooms")
+def show_venue_modal(day, time_range, venues):
+    st.markdown(f"""
+    <div style='margin-bottom: 20px;'>
+        <p style='font-size: 16px; opacity: 0.8;'>
+            Free slots on <span style="color:#6a11cb; font-weight:700">{day}</span> from <span style="background:#f0f2f6; padding:2px 6px; border-radius:4px; font-weight:600; color:#333">{time_range}</span>
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    if venues:
+        cards_html = '<div class="venue-card-row">'
+        for v in venues:
+            # Mock details based on venue name since excel lacks this metadata
+            v_type = "LECTURE HALL" if "L" in v or "A" in v else "LAB" if "LAB" in v.upper() else "TUTORIAL ROOM"
+            capacity = "60" if v_type == "LECTURE HALL" else "30"
+            amenity = "📽️ Projector" if v_type == "LECTURE HALL" else "💻 Computers" if v_type == "LAB" else "📝 Whiteboard"
+            
+            cards_html += f"""
+            <div class="venue-card">
+               <div class="venue-left">
+                   <div class="venue-icon-box">📍</div>
+                   <div class="venue-details">
+                      <div class="venue-name">{v}</div>
+                      <div class="venue-type">{v_type}</div>
+                      <div class="venue-extras">{amenity}</div>
+                   </div>
+               </div>
+               <div class="venue-capacity-badge">👥 {capacity}</div>
+            </div>
+            """
+        cards_html += '</div>'
+        st.markdown(cards_html, unsafe_allow_html=True)
+    else:
+        st.warning("No free classrooms found for this slot.")
+        
+    if st.button("Close", key="close_venue_modal", type="primary", use_container_width=True):
+        st.session_state.active_slot_data = None
+        st.rerun()
+
+# --- CALL THE DIALOG IF STATE IS ACTIVE ---
 if st.session_state.active_slot_data:
     data = st.session_state.active_slot_data
-    
-    # Determine End Time for Label
-    start_dt = datetime.strptime(data['time'], "%H:%M")
-    end_dt = start_dt + timedelta(hours=1)
-    time_range = f"{data['time']} - {end_dt.strftime('%H:%M')}"
-
-    @st.dialog("Available Classrooms")
-    def show_venue_modal():
-        st.markdown(f"""
-        <div style='margin-bottom: 20px;'>
-            <p style='font-size: 16px; opacity: 0.8;'>
-                Free slots on <span style="color:#6a11cb; font-weight:700">{data['day']}</span> from <span style="background:#f0f2f6; padding:2px 6px; border-radius:4px; font-weight:600; color:#333">{time_range}</span>
-            </p>
-        </div>
-        """, unsafe_allow_html=True)
+    try:
+        # Determine End Time for Label
+        start_dt = datetime.strptime(data['time'], "%H:%M")
+        end_dt = start_dt + timedelta(hours=1)
+        time_range = f"{data['time']} - {end_dt.strftime('%H:%M')}"
         
-        if data['venues']:
-            cards_html = '<div class="venue-card-row">'
-            for v in data['venues']:
-                # Mock details based on venue name
-                v_type = "LECTURE HALL" if "L" in v or "A" in v else "LAB" if "LAB" in v.upper() else "TUTORIAL ROOM"
-                capacity = "60" if v_type == "LECTURE HALL" else "30"
-                amenity = "📽️ Projector" if v_type == "LECTURE HALL" else "💻 Computers" if v_type == "LAB" else "📝 Whiteboard"
-                
-                cards_html += f"""
-                <div class="venue-card">
-                   <div class="venue-left">
-                       <div class="venue-icon-box">📍</div>
-                       <div class="venue-details">
-                          <div class="venue-name">{v}</div>
-                          <div class="venue-type">{v_type}</div>
-                          <div class="venue-extras">{amenity}</div>
-                       </div>
-                   </div>
-                   <div class="venue-capacity-badge">👥 {capacity}</div>
-                </div>
-                """
-            cards_html += '</div>'
-            st.markdown(cards_html, unsafe_allow_html=True)
-        else:
-            st.warning("No free classrooms found for this slot.")
-            
-        if st.button("Close", key="close_venue_modal", type="primary", use_container_width=True):
-            st.session_state.active_slot_data = None
-            st.rerun()
-
-    show_venue_modal()
+        # Call the globally defined dialog function
+        show_venue_modal(data['day'], time_range, data['venues'])
+    except Exception as e:
+        st.error(f"Error displaying modal: {e}")
+        st.session_state.active_slot_data = None # Reset on error
 
 
 if not sub_dfs or sched_df is None:
