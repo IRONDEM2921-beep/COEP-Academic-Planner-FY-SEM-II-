@@ -815,45 +815,44 @@ def get_leaderboard_sheet():
         return None
 
 def get_leaderboard_data():
-    """Fetches, cleans, and sorts leaderboard data."""
-    sheet = get_leaderboard_sheet()
-    if not sheet: return pd.DataFrame()
-
+    """Fetches live scores from Google Sheets."""
     try:
-        # Get all records
+        sheet = get_leaderboard_sheet()
+        if not sheet: return pd.DataFrame()
+
+        # Get all values including the header
         data = sheet.get_all_values()
         
-        # ERROR CHECK 1: Empty Sheet
+        # ERROR CHECK: If empty or just header
         if not data or len(data) < 2: 
             return pd.DataFrame()
             
-        # Convert to DataFrame
-        # We assume 5 columns: Date, MIS, Branch, Score, Name
-        # If columns are missing, we pad them to avoid crashes
-        expected_cols = ["Date", "MIS", "Branch", "Score", "Name"]
-        df = pd.DataFrame(data, columns=expected_cols[:len(data[0])])
+        # Create DataFrame
+        # Ensure we have the right number of columns based on the header
+        header = data[0]
+        rows = data[1:]
         
-        # Add missing columns if they don't exist yet
-        for col in expected_cols:
-            if col not in df.columns:
-                df[col] = ""
-
-        # ERROR CHECK 2: Remove Header Row
-        # If the first row contains "Score" in the Score column, drop it
-        df = df[pd.to_numeric(df['Score'], errors='coerce').notnull()]
-
-        # Clean types
-        df['Score'] = df['Score'].astype(int)
-        df['Branch'] = df['Branch'].astype(str).str.strip()
-        df['Name'] = df['Name'].astype(str).str.strip()
+        df = pd.DataFrame(rows, columns=header)
+        
+        # KEY FIX: Ensure 'Score' is treated as a number
+        # We replace empty strings with 0 and convert to int
+        df['Score'] = pd.to_numeric(df['Score'], errors='coerce').fillna(0).astype(int)
+        
+        # Clean text columns to avoid " Artificial Intelligence" (spaces) mismatches
+        if 'Branch' in df.columns:
+            df['Branch'] = df['Branch'].astype(str).str.strip()
+        if 'Name' in df.columns:
+            df['Name'] = df['Name'].astype(str).str.strip()
         
         return df
     except Exception as e:
-        # Silently fail but log if needed
+        # st.error(f"Debug Error: {e}") # Uncomment to see errors on screen
         return pd.DataFrame()
 
 def render_leaderboard_ui(user_branch):
-    """Draws the Branch Wars Leaderboard."""
+    """Calculates and Displays the Branch Champions."""
+    
+    # 1. Fetch fresh data
     df = get_leaderboard_data()
     
     st.markdown("""<h3 style="font-size: 24px; font-weight: 700; margin-bottom: 20px;">🏆 Branch Wars</h3>""", unsafe_allow_html=True)
@@ -863,26 +862,33 @@ def render_leaderboard_ui(user_branch):
         st.info("No records yet. Play to claim the throne!")
         return
 
-    # LOGIC: 
-    # 1. Sort by Score (Highest first)
-    # 2. Drop duplicates on Branch (Keep only the top scorer for that branch)
-    best_per_branch = df.sort_values(by='Score', ascending=False).drop_duplicates(subset=['Branch'])
+    # 2. LOGIC: Group by Branch -> Find Max Score
+    # We sort by Score descending first, so the highest score is at the top
+    df_sorted = df.sort_values(by='Score', ascending=False)
     
-    # Render UI
+    # Then we drop duplicates based on 'Branch', keeping the first (highest) occurrence
+    best_per_branch = df_sorted.drop_duplicates(subset=['Branch'])
+    
+    # 3. Render the Cards
     for _, row in best_per_branch.iterrows():
         b_name = row['Branch']
         score = row['Score']
-        player_name = row['Name'] if row['Name'] else row['MIS'] # Fallback to MIS if Name missing
+        
+        # Handle missing names safely
+        # If Name is empty/nan, fallback to MIS, or "Anonymous"
+        p_name = row.get('Name', '')
+        if not p_name or p_name.lower() == 'nan':
+             p_name = f"MIS: {row.get('MIS', 'Unknown')}"
         
         # Highlight User's Branch
-        is_my_branch = user_branch and (b_name.lower() == str(user_branch).lower())
+        is_my_branch = user_branch and (b_name.lower() == str(user_branch).strip().lower())
         
         # Dynamic Styling
         border_color = "#6a11cb" if is_my_branch else "rgba(128,128,128,0.2)"
         bg_color = "rgba(106,17,203,0.05)" if is_my_branch else "var(--card-bg)"
         trophy = "👑" if is_my_branch else "🛡️"
         
-        html_card = f"""
+        st.markdown(f"""
         <div style="
             border: 2px solid {border_color}; 
             background: {bg_color}; 
@@ -893,27 +899,25 @@ def render_leaderboard_ui(user_branch):
             justify-content: space-between; 
             align-items: center;
             box-shadow: 0 4px 6px rgba(0,0,0,0.05);
-            transition: transform 0.2s;
         ">
             <div>
                 <div style="font-weight: 800; font-size: 15px; color: var(--text-color); margin-bottom:4px;">
                     {trophy} {b_name}
                 </div>
                 <div style="font-size: 12px; opacity: 0.8; color: var(--text-color);">
-                    👤 {player_name}
+                    👤 {p_name}
                 </div>
             </div>
             <div style="text-align: right;">
-                 <div style="font-size: 10px; text-transform: uppercase; font-weight: 700; opacity: 0.6;">Score</div>
+                 <div style="font-size: 10px; text-transform: uppercase; font-weight: 700; opacity: 0.6;">High Score</div>
                  <div style="font-size: 22px; font-weight: 900; color: #6a11cb; line-height: 1;">{score}</div>
             </div>
         </div>
-        """
-        st.markdown(html_card, unsafe_allow_html=True)
+        """, unsafe_allow_html=True)
 
     st.write("")
-    if st.button("🔄 Check for New High Scores", use_container_width=True):
-        st.cache_data.clear() # Clear cache to force fresh fetch
+    # The button simply reruns the script, fetching fresh data because we removed cache
+    if st.button("🔄 Check for Updates", use_container_width=True):
         st.rerun()
 
 # --------------------------------------------------
@@ -1511,11 +1515,13 @@ else:
                 game_html = render_connected_game(mis, branch, name)
                 components.html(game_html, height=650, scrolling=False)
             
-            with col_leaderboard:
+            # ... (Inside Section 4: GAME SECTION) ...
+
+            with col_leaderboard:  # <--- This is your "c_leaderboard"
                 st.markdown("""<h3 style="font-size: 24px; font-weight: 700; margin-bottom: 20px;">🏆 Branch Wars</h3>""", unsafe_allow_html=True)
                 
                 # Show the leaderboard
-                render_leaderboard_ui(branch)
+                render_leaderboard_ui(branch)  # <--- IT IS ALREADY HERE!
                 
                 st.write("")
                 if st.button("🔄 Refresh Scores"):
@@ -1534,4 +1540,5 @@ st.markdown(f"""
     Student Portal © 2026 • Built by <span style="color:#6a11cb; font-weight:700">IRONDEM2921 [AIML]</span>
 </div>
 """, unsafe_allow_html=True)
+
 
