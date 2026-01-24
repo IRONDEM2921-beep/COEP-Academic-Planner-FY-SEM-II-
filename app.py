@@ -124,7 +124,8 @@ div[data-baseweb="input"] input {{ color: white !important; caret-color: white; 
 div[data-testid="stDateInput"] input {{ color: #ffffff !important; font-weight: 600; }}
 
 /* --- BUTTONS --- */
-div.stButton > button {{
+/* Target BOTH standard buttons and download buttons */
+div.stButton > button, div.stDownloadButton > button {{
     width: 100% !important;
     height: 80px !important;        
     min-height: 80px !important;
@@ -149,13 +150,18 @@ div.stButton > button[kind="primary"] {{
 div.stButton > button[kind="primary"] * {{ color: #ffffff !important; }}
 div.stButton > button[kind="primary"]:hover {{ transform: translateY(-2px); box-shadow: 0 6px 15px rgba(106, 17, 203, 0.3); }}
 
-div.stButton > button[kind="secondary"] {{
+/* Explicitly style secondary/default buttons AND download buttons to match */
+div.stButton > button[kind="secondary"], div.stDownloadButton > button {{
     background-color: var(--sec-btn-bg) !important; 
     color: var(--sec-btn-text) !important; 
     border: 2px solid #6a11cb !important; 
     font-weight: 600 !important;
 }}
-div.stButton > button[kind="secondary"]:hover {{ background-color: var(--table-row-hover) !important; }}
+div.stButton > button[kind="secondary"]:hover, div.stDownloadButton > button:hover {{ 
+    background-color: var(--table-row-hover) !important; 
+    border-color: #6a11cb !important;
+    color: var(--sec-btn-text) !important;
+}}
 
 /* --- TIMETABLE GRID --- */
 .timetable-wrapper {{ overflow-x: auto; padding: 20px 5px 40px 5px; }}
@@ -267,7 +273,7 @@ table.custom-grid {{ width: 100%; min-width: 1000px; border-collapse: separate; 
 }}
 [data-testid="stExpander"] summary svg {{ fill: var(--text-color) !important; color: var(--text-color) !important; }}
 
-/* --- VACANT ROOM FINDER CSS (Escaped for f-strings) --- */
+/* --- VACANT ROOM FINDER CSS --- */
 @keyframes fadeInUp {{
     from {{ opacity: 0; transform: translateY(20px); }}
     to {{ opacity: 1; transform: translateY(0); }}
@@ -1344,6 +1350,7 @@ st.markdown(f"""
     Student Portal © 2026 • Built by <span style="color:#6a11cb; font-weight:700">IRONDEM2921 [AIML]</span>
 </div>
 """, unsafe_allow_html=True)
+
 
 
 
