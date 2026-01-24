@@ -1204,22 +1204,18 @@ else:
                 st.button("Search 🔎", type="primary", key="btn_find_room")
 
             # --- Calculation & Render ---
+            # --- Calculation & Render ---
             vacant_rooms = get_vacant_venues(sched_df, selected_day, selected_time)
             
             st.markdown(f"**Found {len(vacant_rooms)} vacant rooms for {selected_day} at {selected_time}:**")
             
             if vacant_rooms:
+                # We build the string in a single line to avoid Markdown indentation errors
                 cards_html = '<div class="vacant-grid">'
                 for room in vacant_rooms:
-                    # Random delay for stagger effect (simulated via CSS order or JS, 
-                    # but here we just use the animation class)
-                    cards_html += f"""
-                    <div class="vacant-card">
-                        <h4>{room}</h4>
-                        <p>Available</p>
-                    </div>
-                    """
+                    cards_html += f'<div class="vacant-card"><h4>{room}</h4><p>Available</p></div>'
                 cards_html += "</div>"
+                
                 st.markdown(cards_html, unsafe_allow_html=True)
             else:
                 st.warning("😕 It seems every known classroom is occupied at this time!")
@@ -1332,5 +1328,6 @@ st.markdown(f"""
     Student Portal © 2026 • Built by <span style="color:#6a11cb; font-weight:700">IRONDEM2921 [AIML]</span>
 </div>
 """, unsafe_allow_html=True)
+
 
 
