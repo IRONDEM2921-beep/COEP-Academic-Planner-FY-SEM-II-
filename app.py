@@ -266,6 +266,64 @@ table.custom-grid {{ width: 100%; min-width: 1000px; border-collapse: separate; 
     font-weight: 800 !important;
 }}
 [data-testid="stExpander"] summary svg {{ fill: var(--text-color) !important; color: var(--text-color) !important; }}
+
+
+/* --- VACANT ROOM FINDER CSS --- */
+@keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.vacant-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 15px;
+    margin-top: 20px;
+}
+
+.vacant-card {
+    background: var(--card-bg);
+    border: 2px solid #4ade80;
+    color: var(--text-color);
+    border-radius: 15px;
+    padding: 15px;
+    text-align: center;
+    box-shadow: 0 4px 10px rgba(74, 222, 128, 0.2);
+    animation: fadeInUp 0.5s ease-out forwards;
+    transition: transform 0.2s;
+}
+
+.vacant-card:hover {
+    transform: translateY(-5px);
+    background: #4ade80;
+    box-shadow: 0 8px 20px rgba(74, 222, 128, 0.4);
+}
+
+.vacant-card:hover h4, .vacant-card:hover p {
+    color: #003300 !important;
+}
+
+.vacant-card h4 {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 700;
+    color: #4ade80;
+}
+
+.vacant-card p {
+    margin: 5px 0 0 0;
+    font-size: 11px;
+    opacity: 0.8;
+}
+
+.finder-container {
+    background: var(--card-bg);
+    border-radius: 20px;
+    padding: 25px;
+    margin: 30px 0;
+    box-shadow: 0 10px 30px var(--card-shadow);
+    border: 1px solid rgba(128,128,128,0.1);
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -451,6 +509,72 @@ def generate_master_ics(weekly_schedule, semester_end_date):
         except: continue
     ics_lines.append("END:VCALENDAR")
     return "\n".join(ics_lines)
+
+
+def normalize_venue(venue_text):
+    """Cleans up venue names to ensure 'AC 101' matches 'ac101'."""
+    if pd.isna(venue_text) or str(venue_text).strip() in ["-", "", "nan"]:
+        return None
+    return str(venue_text).strip().upper()
+
+def get_vacant_venues(sched_df, target_day, target_time_str):
+    """
+    Returns a list of venues that are NOT occupied at the specific Day and Time.
+    """
+    if sched_df is None or sched_df.empty:
+        return []
+
+    # 1. Parse the Target Time
+    # We use a dummy date to handle time comparisons easily
+    try:
+        q_time = datetime.strptime(target_time_str, "%H:%M").time()
+    except:
+        return [] # Invalid time format
+
+    # 2. Identify ALL known venues from the database
+    # (We assume any venue mentioned in the sheet exists)
+    venue_col = next((c for c in sched_df.columns if "Venue" in c), None)
+    if not venue_col: return []
+    
+    all_venues = set()
+    for v in sched_df[venue_col].unique():
+        norm = normalize_venue(v)
+        if norm: all_venues.add(norm)
+
+    # 3. Find Occupied Venues
+    occupied_venues = set()
+    
+    # Filter by Day first
+    day_col = next((c for c in sched_df.columns if "Day" in c), None)
+    time_col = next((c for c in sched_df.columns if "Time" in c), None)
+    
+    day_schedule = sched_df[sched_df[day_col].astype(str).str.strip().str.title() == target_day]
+    
+    for _, row in day_schedule.iterrows():
+        start_str, duration = parse_time(row[time_col])
+        if start_str:
+            try:
+                # Construct Start and End Datetime for comparison
+                class_start = datetime.strptime(start_str, "%H:%M")
+                class_end = class_start + timedelta(hours=duration)
+                
+                # Check if our Target Time falls within this class
+                # We convert everything to minutes for easier comparison
+                q_mins = q_time.hour * 60 + q_time.minute
+                s_mins = class_start.hour * 60 + class_start.minute
+                e_mins = class_end.hour * 60 + class_end.minute
+                
+                # If the query time is between start (inclusive) and end (exclusive)
+                if s_mins >= s_mins and q_mins < e_mins:
+                    occ_venue = normalize_venue(row[venue_col])
+                    if occ_venue:
+                        occupied_venues.add(occ_venue)
+            except:
+                continue
+
+    # 4. Subtract Occupied from All to get Vacant
+    vacant = sorted(list(all_venues - occupied_venues))
+    return vacant
 
 # --------------------------------------------------
 # 5. DATA LOADING & LOGIC
@@ -1028,6 +1152,84 @@ else:
             # --- ALLOCATED SUBJECTS ---
             with st.expander("Subject Allocation List", expanded=False):
                 st.markdown(render_subject_html(subs, link_map), unsafe_allow_html=True)
+
+            # ... existing code for displaying timetable grid ...
+            
+            # --- NEW: SMART VACANT ROOM FINDER ---
+            st.markdown("""<hr style="border:1px solid rgba(128,128,128,0.2); margin: 40px 0;">""", unsafe_allow_html=True)
+            
+            # Container for the tool
+            st.markdown("""
+            <div class="finder-container">
+                <h3 style="background: linear-gradient(to right, #4ade80, #2575fc); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-weight: 800; margin-bottom: 5px;">
+                    🔍 Empty Classroom Finder
+                </h3>
+                <p style="font-size: 14px; opacity: 0.7; margin-bottom: 20px;">
+                    Find a quiet place to study or chill right now.
+                </p>
+            """, unsafe_allow_html=True)
+
+            # --- Logic for Defaults (Current Time) ---
+            now = datetime.now()
+            current_day = now.strftime("%A")
+            current_hour = now.hour
+            
+            # Round current time to nearest slot logic for default selection
+            # If it's 10:45, we probably want to check the 10:30 slot
+            default_slot_index = 0
+            slots = ["8:30", "9:30", "10:30", "11:30", "12:30", "13:30", "14:30", "15:30", "16:30", "17:30"]
+            
+            # Simple heuristic to pick default time in dropdown
+            for i, s in enumerate(slots):
+                try:
+                    h = int(s.split(':')[0])
+                    if current_hour == h:
+                        default_slot_index = i
+                        break
+                except: pass
+
+            # --- Controls UI ---
+            c_find_1, c_find_2, c_find_3 = st.columns([2, 2, 1])
+            
+            with c_find_1:
+                days_list = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
+                # Default to current day if it's a weekday, else Monday
+                def_day_idx = days_list.index(current_day) if current_day in days_list else 0
+                selected_day = st.selectbox("Select Day", days_list, index=def_day_idx)
+                
+            with c_find_2:
+                selected_time = st.selectbox("Select Time", slots, index=default_slot_index)
+                
+            with c_find_3:
+                st.write("") # Spacer
+                st.write("") # Spacer
+                # Button is just for UX feel, as Streamlit updates on selectbox change anyway
+                st.button("Search 🔎", type="primary", key="btn_find_room")
+
+            # --- Calculation & Render ---
+            vacant_rooms = get_vacant_venues(sched_df, selected_day, selected_time)
+            
+            st.markdown(f"**Found {len(vacant_rooms)} vacant rooms for {selected_day} at {selected_time}:**")
+            
+            if vacant_rooms:
+                cards_html = '<div class="vacant-grid">'
+                for room in vacant_rooms:
+                    # Random delay for stagger effect (simulated via CSS order or JS, 
+                    # but here we just use the animation class)
+                    cards_html += f"""
+                    <div class="vacant-card">
+                        <h4>{room}</h4>
+                        <p>Available</p>
+                    </div>
+                    """
+                cards_html += "</div>"
+                st.markdown(cards_html, unsafe_allow_html=True)
+            else:
+                st.warning("😕 It seems every known classroom is occupied at this time!")
+            
+            st.markdown("</div>", unsafe_allow_html=True) # Close Container
+            
+            # ... continue to Attendance Tracker ...
             
             # --- 2. ATTENDANCE TRACKER ---
             st.markdown("""<hr style="border:1px solid rgba(128,128,128,0.2); margin: 40px 0;">""", unsafe_allow_html=True)
@@ -1133,3 +1335,4 @@ st.markdown(f"""
     Student Portal © 2026 • Built by <span style="color:#6a11cb; font-weight:700">IRONDEM2921 [AIML]</span>
 </div>
 """, unsafe_allow_html=True)
+
