@@ -64,6 +64,7 @@ dark_theme = {
 current_theme = light_theme if st.session_state.theme == 'light' else dark_theme
 
 # Generate CSS
+# Generate CSS
 st.markdown(f"""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap');
@@ -125,7 +126,7 @@ div[data-testid="stDateInput"] input {{ color: #ffffff !important; font-weight: 
 /* --- BUTTONS --- */
 div.stButton > button {{
     width: 100% !important;
-    height: 80px !important;       
+    height: 80px !important;        
     min-height: 80px !important;
     white-space: normal !important; 
     line-height: 1.2 !important;
@@ -208,7 +209,6 @@ table.custom-grid {{ width: 100%; min-width: 1000px; border-collapse: separate; 
     display: flex;
     flex-direction: column;
 }}
-/* Spacer = 25% height (30 mins of the 2-hour spanned block) */
 .offset-spacer {{
     flex: 0 0 25%; 
     min-height: 25%; 
@@ -267,21 +267,20 @@ table.custom-grid {{ width: 100%; min-width: 1000px; border-collapse: separate; 
 }}
 [data-testid="stExpander"] summary svg {{ fill: var(--text-color) !important; color: var(--text-color) !important; }}
 
+/* --- VACANT ROOM FINDER CSS (Escaped for f-strings) --- */
+@keyframes fadeInUp {{
+    from {{ opacity: 0; transform: translateY(20px); }}
+    to {{ opacity: 1; transform: translateY(0); }}
+}}
 
-/* --- VACANT ROOM FINDER CSS --- */
-@keyframes fadeInUp {
-    from { opacity: 0; transform: translateY(20px); }
-    to { opacity: 1; transform: translateY(0); }
-}
-
-.vacant-grid {
+.vacant-grid {{
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
     gap: 15px;
     margin-top: 20px;
-}
+}}
 
-.vacant-card {
+.vacant-card {{
     background: var(--card-bg);
     border: 2px solid #4ade80;
     color: var(--text-color);
@@ -291,39 +290,39 @@ table.custom-grid {{ width: 100%; min-width: 1000px; border-collapse: separate; 
     box-shadow: 0 4px 10px rgba(74, 222, 128, 0.2);
     animation: fadeInUp 0.5s ease-out forwards;
     transition: transform 0.2s;
-}
+}}
 
-.vacant-card:hover {
+.vacant-card:hover {{
     transform: translateY(-5px);
     background: #4ade80;
     box-shadow: 0 8px 20px rgba(74, 222, 128, 0.4);
-}
+}}
 
-.vacant-card:hover h4, .vacant-card:hover p {
+.vacant-card:hover h4, .vacant-card:hover p {{
     color: #003300 !important;
-}
+}}
 
-.vacant-card h4 {
+.vacant-card h4 {{
     margin: 0;
     font-size: 18px;
     font-weight: 700;
     color: #4ade80;
-}
+}}
 
-.vacant-card p {
+.vacant-card p {{
     margin: 5px 0 0 0;
     font-size: 11px;
     opacity: 0.8;
-}
+}}
 
-.finder-container {
+.finder-container {{
     background: var(--card-bg);
     border-radius: 20px;
     padding: 25px;
     margin: 30px 0;
     box-shadow: 0 10px 30px var(--card-shadow);
     border: 1px solid rgba(128,128,128,0.1);
-}
+}}
 </style>
 """, unsafe_allow_html=True)
 
@@ -525,14 +524,12 @@ def get_vacant_venues(sched_df, target_day, target_time_str):
         return []
 
     # 1. Parse the Target Time
-    # We use a dummy date to handle time comparisons easily
     try:
         q_time = datetime.strptime(target_time_str, "%H:%M").time()
     except:
         return [] # Invalid time format
 
     # 2. Identify ALL known venues from the database
-    # (We assume any venue mentioned in the sheet exists)
     venue_col = next((c for c in sched_df.columns if "Venue" in c), None)
     if not venue_col: return []
     
@@ -564,8 +561,8 @@ def get_vacant_venues(sched_df, target_day, target_time_str):
                 s_mins = class_start.hour * 60 + class_start.minute
                 e_mins = class_end.hour * 60 + class_end.minute
                 
-                # If the query time is between start (inclusive) and end (exclusive)
-                if s_mins >= s_mins and q_mins < e_mins:
+                # CORRECTED LOGIC: Is Query Time >= Start AND Query Time < End?
+                if q_mins >= s_mins and q_mins < e_mins:
                     occ_venue = normalize_venue(row[venue_col])
                     if occ_venue:
                         occupied_venues.add(occ_venue)
@@ -1335,4 +1332,5 @@ st.markdown(f"""
     Student Portal © 2026 • Built by <span style="color:#6a11cb; font-weight:700">IRONDEM2921 [AIML]</span>
 </div>
 """, unsafe_allow_html=True)
+
 
