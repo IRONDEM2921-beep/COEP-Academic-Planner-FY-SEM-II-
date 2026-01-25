@@ -101,38 +101,40 @@ html, body, [class*="css"], .stMarkdown, div, span, p, h1, h2, h3, h4, h5, h6 {{
 }}
 
 /* --- FIXES FOR VISIBILITY --- */
-[data-testid="stSidebar"] p, [data-testid="stSidebar"] span, [data-testid="stSidebar"] div, [data-testid="stSidebar"] h1, [data-testid="stSidebar"] h2, [data-testid="stSidebar"] h3 {
+[data-testid="stSidebar"] p, [data-testid="stSidebar"] span, [data-testid="stSidebar"] div, [data-testid="stSidebar"] h1, [data-testid="stSidebar"] h2, [data-testid="stSidebar"] h3 {{
     color: var(--text-color) !important;
-}
+}}
 
 /* Fix Tooltip: Ensure text color updates correctly in Light Mode */
-div[data-baseweb="popover"], div[data-baseweb="tooltip"] {
+div[data-baseweb="popover"], div[data-baseweb="tooltip"] {{
     background-color: var(--card-bg) !important;
     color: var(--text-color) !important;
     border: 1px solid rgba(128, 128, 128, 0.2) !important;
     box-shadow: 0 4px 15px var(--card-shadow) !important;
-}
+}}
+
 /* Force inner text of tooltips to follow the theme color */
-div[data-baseweb="popover"] *, div[data-baseweb="tooltip"] * {
+div[data-baseweb="popover"] *, div[data-baseweb="tooltip"] * {{
     color: var(--text-color) !important;
-}
+}}
 
 /* Fix Input: Force ALL text to be white because the background is fixed to Dark */
-div[data-baseweb="input"] {
+div[data-baseweb="input"] {{
     border: none;
     border-radius: 50px !important;
     background-color: #262730; 
     padding: 8px 20px;
     box-shadow: inset 0 2px 4px rgba(0,0,0,0.5);
     color: white !important;
-}
+}}
+
 /* This * selector ensures helper text like "Press Enter to apply" is also white */
-div[data-baseweb="input"] * {
+div[data-baseweb="input"] * {{
     color: white !important;
     caret-color: white;
     -webkit-text-fill-color: white !important;
-}
-div[data-testid="stDateInput"] input { color: #ffffff !important; font-weight: 600; }
+}}
+div[data-testid="stDateInput"] input {{ color: #ffffff !important; font-weight: 600; }}
 
 /* --- BUTTONS --- */
 /* Target BOTH standard buttons and download buttons */
@@ -1527,6 +1529,7 @@ st.markdown(f"""
     Student Portal © 2026 • Built by <span style="color:#6a11cb; font-weight:700">IRONDEM2921 [AIML]</span>
 </div>
 """, unsafe_allow_html=True)
+
 
 
 
