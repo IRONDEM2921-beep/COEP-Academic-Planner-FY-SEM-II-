@@ -119,7 +119,7 @@ div[data-baseweb="popover"] *, div[data-baseweb="tooltip"] * {{
     font-weight: 700 !important;
 }}
 
-/* 3. INPUT BOX FIX ("Press Enter to apply") */
+/* 3. INPUT BOX FIX ("Press Enter to apply" & Placeholders) */
 /* Set the dark background */
 div[data-baseweb="input"] {{
     background-color: #262730 !important; 
@@ -136,12 +136,11 @@ div[data-baseweb="input"] input {{
     font-weight: 600 !important;
 }}
 
-/* Force the Placeholder text ("Press Enter to apply") to be RED */
-/* We use multiple selectors to ensure browser compatibility */
+/* Force the Placeholder ("e.g. 612572034") to be RED */
 div[data-baseweb="input"] input::placeholder {{
     color: #FF0000 !important;
     -webkit-text-fill-color: #FF0000 !important;
-    opacity: 1 !important; /* Required for Firefox */
+    opacity: 1 !important; 
     font-weight: 600 !important;
 }}
 div[data-baseweb="input"] input::-webkit-input-placeholder {{
@@ -149,9 +148,13 @@ div[data-baseweb="input"] input::-webkit-input-placeholder {{
     -webkit-text-fill-color: #FF0000 !important;
 }}
 
-/* Fallback for helper text if it appears as a separate element */
-div[data-testid="stMarkdownContainer"] p {{
-    color: var(--text-color) !important;
+/* NEW: Force "Press Enter to apply" Instruction to be RED */
+div[data-testid="InputInstructions"] > span, 
+div[data-testid="InputInstructions"] {{
+    color: #FF0000 !important;
+    -webkit-text-fill-color: #FF0000 !important;
+    font-weight: 700 !important;
+    visibility: visible !important;
 }}
 
 /* --- BUTTONS --- */
@@ -1547,6 +1550,7 @@ st.markdown(f"""
     Student Portal © 2026 • Built by <span style="color:#6a11cb; font-weight:700">IRONDEM2921 [AIML]</span>
 </div>
 """, unsafe_allow_html=True)
+
 
 
 
