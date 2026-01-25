@@ -1437,9 +1437,24 @@ else:
                 # We build the string in a single line to avoid Markdown indentation errors
                 cards_html = '<div class="vacant-grid">'
                 for room in vacant_rooms:
-                    cards_html += f'<div class="vacant-card"><h4>{room}</h4><p>Available</p></div>'
-                cards_html += "</div>"
+                    # --- FLOOR MAPPING LOGIC START ---
+                    r_clean = str(room).upper().strip()
+                    floor_msg = "Available" # Default fallback
+
+                    if r_clean in ["NC01", "NC02", "NC03", "NC04"]:
+                        floor_msg = "First Floor"
+                    elif r_clean in ["NC05", "NC06", "NC07", "NC08"]:
+                        floor_msg = "Second Floor"
+                    elif r_clean in ["NC09", "NC10"]:
+                        floor_msg = "Third Floor"
+                    elif r_clean in ["NC11", "NC12", "NC13", "NC14"]:
+                        floor_msg = "Fourth Floor"
+                    # --- FLOOR MAPPING LOGIC END ---
+
+                    # Inject the floor_msg variable into the HTML string
+                    cards_html += f'<div class="vacant-card"><h4>{room}</h4><p>{floor_msg}</p></div>'
                 
+                cards_html += "</div>"
                 st.markdown(cards_html, unsafe_allow_html=True)
             else:
                 st.warning("😕 It seems every known classroom is occupied at this time!")
@@ -1555,6 +1570,7 @@ st.markdown(f"""
     Student Portal © 2026 • Built by <span style="color:#6a11cb; font-weight:700">IRONDEM2921 [AIML]</span>
 </div>
 """, unsafe_allow_html=True)
+
 
 
 
