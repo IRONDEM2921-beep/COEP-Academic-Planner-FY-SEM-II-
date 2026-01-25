@@ -236,12 +236,12 @@ table.custom-grid {{ width: 100%; min-width: 1000px; border-collapse: separate; 
 .class-card.filled:hover {{ transform: translateY(-5px) scale(1.03); box-shadow: 0 15px 30px rgba(0,0,0,0.15) !important; z-index: 100; }}
 .type-empty {{ background: var(--card-bg); border: 2px dashed rgba(160, 160, 200, 0.2); border-radius: 18px; }}
 .sub-title {{ font-weight: 700; font-size: 13px; margin-bottom: 4px; }}
-.sub-meta { 
+.sub-meta {{ 
     font-size: 13px !important; 
     opacity: 1 !important; 
     font-weight: 500; 
     margin-top: 4px;
-}
+}}
 .batch-badge {{
     background: rgba(255,255,255,0.6); padding: 3px 8px; border-radius: 10px;
     font-size: 10px; font-weight: 700; text-transform: uppercase; display: inline-block;
@@ -1555,6 +1555,7 @@ st.markdown(f"""
     Student Portal © 2026 • Built by <span style="color:#6a11cb; font-weight:700">IRONDEM2921 [AIML]</span>
 </div>
 """, unsafe_allow_html=True)
+
 
 
 
