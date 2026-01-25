@@ -825,8 +825,16 @@ def calculate_semester_totals(timetable_entries):
         weekly_map[d].append(entry)
         key = f"{entry['Subject']}|{entry['Type']}"
         totals[key] = 0
+    
     curr_date = SEMESTER_START
-    while curr_date <= SEMESTER_END:
+    # CHANGE: Stop counting at today's date instead of SEMESTER_END
+    # to get "Total lectures taken place till now"
+    end_date = date.today() 
+    
+    while curr_date <= end_date:
+        # Don't count future dates if SEMESTER_START is in future
+        if curr_date > SEMESTER_END: break 
+        
         day_name = curr_date.strftime("%A")
         if day_name in weekly_map:
             for cls in weekly_map[day_name]:
@@ -1503,6 +1511,7 @@ else:
 
             # --- 3. CALCULATOR ---
             st.markdown("""<hr style="border:1px solid rgba(128,128,128,0.2); margin: 40px 0;">""", unsafe_allow_html=True)
+            # ... existing code above ...
             st.markdown("""<h3 style="font-size: 28px; font-weight: 700; margin-bottom: 20px; background: linear-gradient(to right, #6a11cb, #fbc2eb); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">📊 Attendance Calculator</h3>""", unsafe_allow_html=True)
             
             total_possible = calculate_semester_totals(table)
@@ -1517,13 +1526,14 @@ else:
                     if len(parts) >= 5 and parts[0] == mis and parts[2] == subject_name and parts[3] == subject_type:
                         attended += 1
                 
-                percentage = (attended / total_count * 100) if total_count > 0 else 0
-                req_for_75 = (0.75 * total_count)
-                needed = req_for_75 - attended
+                # 1. Calculate Current Percentage
+                percentage = (attended / total_count * 100) if total_count > 0 else 100.0
+                
+                # 2. Define Styles based on Percentage
                 border_grad = "linear-gradient(135deg, #6a11cb, #2575fc)"
                 is_dark = st.session_state.theme == 'dark'
                 bg_color = "rgba(106, 17, 203, 0.05)" if is_dark else "#f0f0f0"
-                msg_color = "#2ecc71"
+                msg_color = "#2ecc71" # Green by default
 
                 if percentage < 60:
                     border_grad = "linear-gradient(135deg, #ff9a9e, #fecfef)" 
@@ -1534,10 +1544,39 @@ else:
                     bg_color = "rgba(255, 165, 0, 0.05)" if is_dark else "#fffdf5"
                     msg_color = "#e67e22"
 
+                # 3. Calculate "Need to Attend" or "Safe to Bunk"
+                # Formula derived from: (Attended + X) / (Total + X) >= 0.75
+                # Result: X >= 3*Total - 4*Attended
+                
+                shortfall_x = (3 * total_count) - (4 * attended)
+                
+                status_msg = ""
+                
+                if shortfall_x > 0:
+                    # Need to attend more
+                    status_msg = f"Attend next <b>{shortfall_x}</b> lectures to hit 75%"
+                    msg_color = "#e74c3c" if percentage < 75 else "#e67e22"
+                else:
+                    # Already above 75%, calculate how many they can miss
+                    # Formula: A / (T + Y) >= 0.75  =>  Y <= (4A - 3T) / 3
+                    bunkable = int((4 * attended - 3 * total_count) / 3)
+                    if bunkable > 0:
+                        status_msg = f"On Track! You can miss <b>{bunkable}</b> lectures."
+                        msg_color = "#2ecc71"
+                    else:
+                        status_msg = "On Track! Don't miss the next one."
+                        msg_color = "#2ecc71"
+
                 with row_cols[col_idx % 3]:
-                    st.markdown(f"""<div class="metric-card" style="border-top: 5px solid transparent; border-image: {border_grad} 1; background-color: {bg_color};"><div class="metric-title">{subject_name} <br> <span style="font-size:10px; opacity:0.7">({subject_type})</span></div><div class="metric-value">{percentage:.1f}%</div><div class="metric-sub">{attended} / {total_count} Sessions</div></div>""", unsafe_allow_html=True)
-                    if needed > 0: st.markdown(f"<div style='text-align:center; margin-top:10px; color:{msg_color}; font-weight:600; font-size:14px;'>Attend {int(needed) + 1} more</div>", unsafe_allow_html=True)
-                    else: st.markdown(f"<div style='text-align:center; margin-top:10px; color:{msg_color}; font-weight:600; font-size:14px;'>Safe!</div>", unsafe_allow_html=True)
+                    st.markdown(f"""
+                    <div class="metric-card" style="border-top: 5px solid transparent; border-image: {border_grad} 1; background-color: {bg_color};">
+                        <div class="metric-title">{subject_name} <br> <span style="font-size:10px; opacity:0.7">({subject_type})</span></div>
+                        <div class="metric-value">{percentage:.1f}%</div>
+                        <div class="metric-sub">{attended} / {total_count} Conducted</div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    
+                    st.markdown(f"<div style='text-align:center; margin-top:10px; color:{msg_color}; font-weight:600; font-size:14px;'>{status_msg}</div>", unsafe_allow_html=True)
                     st.write("") 
                 col_idx += 1
 
@@ -1570,6 +1609,7 @@ st.markdown(f"""
     Student Portal © 2026 • Built by <span style="color:#6a11cb; font-weight:700">IRONDEM2921 [AIML]</span>
 </div>
 """, unsafe_allow_html=True)
+
 
 
 
