@@ -877,9 +877,7 @@ def get_leaderboard_data():
         sheet_url = st.secrets["game_sheet_url"]
         sh = client.open_by_url(sheet_url)
 
-        # --- ADD THIS DEBUG LINE HERE ---
-        st.warning(f"⚠️ Currently Connected to Sheet: {sh.title}") 
-        # --------------------------------
+
         
         # STRICT CHECK: Try to find 'Leaderboard'. 
         # If not found, print error instead of silently loading wrong sheet.
@@ -1631,6 +1629,7 @@ st.markdown(f"""
     Student Portal © 2026 • Built by <span style="color:#6a11cb; font-weight:700">IRONDEM2921 [AIML]</span>
 </div>
 """, unsafe_allow_html=True)
+
 
 
 
