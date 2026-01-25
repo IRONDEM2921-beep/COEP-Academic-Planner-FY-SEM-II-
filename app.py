@@ -658,23 +658,51 @@ def load_data():
 
 def get_schedule(mis, sub_dfs, sched_df):
     found_subs = []
-    name, branch = "Unknown", "General"
+    # Initialize defaults
+    name = "Unknown"
+    branch = "General" 
     target_mis = clean_mis(mis)
     
-    # 1. Find User Subjects
+    # 1. Find User Subjects & Info across ALL sheets
     for df in sub_dfs:
         mis_col = next((c for c in df.columns if "MIS" in c.upper()), None)
         if not mis_col: continue
+        
+        # Create helper key for matching
         df["_KEY"] = df[mis_col].apply(clean_mis)
         match = df[df["_KEY"] == target_mis]
+        
         if not match.empty:
             row = match.iloc[0]
+            
+            # --- A. NAME LOGIC ---
+            # Capture name from the first sheet that has it
             if name == "Unknown":
-                name = row.get(next((c for c in df.columns if "Name" in c), ""), "Student")
-                branch = row.get(next((c for c in df.columns if "Branch" in c), ""), "General")
+                name_col = next((c for c in df.columns if "Name" in c), None)
+                if name_col:
+                    found_name = str(row[name_col]).strip()
+                    if found_name and found_name.lower() != "nan":
+                        name = found_name
+
+            # --- B. IMPROVED BRANCH LOGIC ---
+            # Look for a branch column in THIS specific sheet
+            branch_col = next((c for c in df.columns if "Branch" in c), None)
+            if branch_col:
+                found_branch = str(row[branch_col]).strip()
+                
+                # Update 'branch' only if:
+                # 1. We currently have the default "General"
+                # 2. The new found_branch is VALID (not "General", empty, or "nan")
+                is_valid = found_branch and found_branch.lower() not in ["nan", "", "-", "general"]
+                
+                if branch == "General" and is_valid:
+                    branch = found_branch
+
+            # --- C. SUBJECT EXTRACTION ---
             sub_col = next((c for c in df.columns if "Subject" in c or "Title" in c), None)
             div_col = next((c for c in df.columns if "Division" in c), None)
             batch_col = next((c for c in df.columns if "Batch" in c or "BATCH" in c.upper()), None)
+            
             if sub_col:
                 found_subs.append({
                     "Subject": correct_subject_name(str(row[sub_col]).strip()),
@@ -682,7 +710,7 @@ def get_schedule(mis, sub_dfs, sched_df):
                     "Batch": str(row[batch_col]) if batch_col else ""
                 })
     
-    # 2. Map to Timetable
+    # 2. Map to Timetable (Standard Logic)
     timetable = []
     if sched_df is not None and found_subs:
         cols = sched_df.columns
@@ -710,23 +738,17 @@ def get_schedule(mis, sub_dfs, sched_df):
                 is_batch_specific = is_lab or is_tutorial
 
                 if (not is_batch_specific) or (t_batch == "all" or t_batch == s_batch):
-                    # NEW: Parse exact duration
                     start, dur_hours = parse_time(row[t_time_col])
                     
                     if start:
-                        # Determine Row Span
-                        # 1h = 1, 1.5h = 2, 2h = 2
                         row_span = int(dur_hours)
                         if dur_hours > 1.2 and dur_hours <= 2.2:
                             row_span = 2
                         elif dur_hours > 2.2:
-                            row_span = 3 # Rare
+                            row_span = 3 
                         
-                        # Determine Offset (e.g., 11:00 start in a 10:30 slot system)
                         is_offset = False
                         if ":00" in start or (dur_hours == 1.5):
-                             # Heuristic: If it's 1.5h, it's likely an offset class 
-                             # or if it starts on :00 in a :30 grid.
                              is_offset = True
 
                         display_type = "LAB" if is_lab else "TUTORIAL" if is_tutorial else "THEORY"
