@@ -101,48 +101,58 @@ html, body, [class*="css"], .stMarkdown, div, span, p, h1, h2, h3, h4, h5, h6 {{
 }}
 
 /* --- FIXES FOR VISIBILITY --- */
+
 /* 1. Global Sidebar Text Fix */
 [data-testid="stSidebar"] p, [data-testid="stSidebar"] span, [data-testid="stSidebar"] div, [data-testid="stSidebar"] h1, [data-testid="stSidebar"] h2, [data-testid="stSidebar"] h3 {{
     color: var(--text-color) !important;
 }}
 
-/* 2. TOOLTIP FIX ("Toggle Dark Mode") - Force Bright Red */
+/* 2. TOOLTIP FIX ("Toggle Dark Mode") */
 div[data-baseweb="popover"], div[data-baseweb="tooltip"] {{
     background-color: var(--card-bg) !important;
     border: 1px solid rgba(128, 128, 128, 0.2) !important;
     box-shadow: 0 4px 15px var(--card-shadow) !important;
 }}
-
-/* Target every text element inside the tooltip and force it RED */
 div[data-baseweb="popover"] *, div[data-baseweb="tooltip"] * {{
     color: #FF0000 !important; /* Bright Red */
     -webkit-text-fill-color: #FF0000 !important;
     font-weight: 700 !important;
 }}
 
-/* 3. INPUT BOX FIX ("Press Enter to apply") - Force Bright Red */
+/* 3. INPUT BOX FIX ("Press Enter to apply") */
+/* Set the dark background */
 div[data-baseweb="input"] {{
-    border: none;
+    background-color: #262730 !important; 
     border-radius: 50px !important;
-    background-color: #262730; 
-    padding: 8px 20px;
+    border: none !important;
     box-shadow: inset 0 2px 4px rgba(0,0,0,0.5);
 }}
 
-/* Target every text element inside the input box (typed text + placeholder + hints) */
-div[data-baseweb="input"] * {{
-    color: #FF0000 !important; /* Bright Red */
-    caret-color: #FF0000 !important; /* Red Cursor */
+/* Force the typed text to be RED */
+div[data-baseweb="input"] input {{
+    color: #FF0000 !important;
+    caret-color: #FF0000 !important;
     -webkit-text-fill-color: #FF0000 !important;
     font-weight: 600 !important;
 }}
 
-/* Specific fallback for placeholder text just in case */
+/* Force the Placeholder text ("Press Enter to apply") to be RED */
+/* We use multiple selectors to ensure browser compatibility */
 div[data-baseweb="input"] input::placeholder {{
     color: #FF0000 !important;
-    opacity: 1 !important;
+    -webkit-text-fill-color: #FF0000 !important;
+    opacity: 1 !important; /* Required for Firefox */
+    font-weight: 600 !important;
 }}
-div[data-testid="stDateInput"] input {{ color: #ffffff !important; font-weight: 600; }}
+div[data-baseweb="input"] input::-webkit-input-placeholder {{
+    color: #FF0000 !important;
+    -webkit-text-fill-color: #FF0000 !important;
+}}
+
+/* Fallback for helper text if it appears as a separate element */
+div[data-testid="stMarkdownContainer"] p {{
+    color: var(--text-color) !important;
+}}
 
 /* --- BUTTONS --- */
 /* Target BOTH standard buttons and download buttons */
@@ -1537,6 +1547,7 @@ st.markdown(f"""
     Student Portal © 2026 • Built by <span style="color:#6a11cb; font-weight:700">IRONDEM2921 [AIML]</span>
 </div>
 """, unsafe_allow_html=True)
+
 
 
 
