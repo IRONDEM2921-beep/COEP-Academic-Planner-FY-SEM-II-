@@ -1626,9 +1626,10 @@ else:
 footer_color = "var(--footer-color)"
 st.markdown(f"""
 <div style="text-align: center; margin-top: 50px; font-size: 13px; color: {footer_color};">
-    Student Portal © 2026 • Built by <span style="color:#6a11cb; font-weight:700">DEEP [AIML]</span>
+    Student Portal © 2026 • Built by <span style="color:#6a11cb; font-weight:700">HARSHAL [AIML]</span>
 </div>
 """, unsafe_allow_html=True)
+
 
 
 
